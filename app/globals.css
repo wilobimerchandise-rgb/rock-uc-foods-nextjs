@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   ROCK UC FOODS - Brand Kit Design Tokens
+   Playbook v2 Section 4B & 9 (Single Source of Truth)
+   ========================================================================== */
+
+:root {
+  --ink: #0B0A09;
+  --ink-2: #17120F;
+  --gold: #D4AF37;
+  --gold-light: #F3D98B;
+  --gold-deep: #9C7A1E;
+  --cream: #F7EFD9;
+  --yellow: #F2C230;
+  --purple: #5B2A6E;
+  --wine: #6B1230;
+  --red: #B3261E;
+
+  /* WCAG AA Compliant Surface Roles */
+  --bg-primary: var(--ink);
+  --bg-card: var(--ink-2);
+  --text-primary: var(--cream);
+  --text-gold: var(--gold);
+  --btn-primary: var(--wine);
+}
+
+/* Gold Gradient Headline Utility (Live text 32px or larger only) */
+.gold-headline {
+  background: linear-gradient(180deg, #F3D98B 0%, #D4AF37 55%, #9C7A1E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Subtle luxury gold border */
+.gold-border {
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+/* High contrast primary button */
+.btn-luxury {
+  background-color: var(--wine);
+  color: var(--cream);
+  font-weight: 600;
+  border-radius: 4px;
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-luxury:hover {
+  background-color: #82173B;
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.2);
+}
+
+/* Tabular figures for pricing numbers */
+.price-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
