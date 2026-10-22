@@ -395,6 +395,9 @@ export function generateReceipt(input: GenerateReceiptInput): Receipt {
   );
 
   const paidToDateKobo = priorPaidKobo + input.amountReceivedKobo;
+  if (paidToDateKobo > invoice.totalKobo && !input.overpaymentReason) {
+    throw new Error(`Payment exceeds invoice total (${invoice.totalKobo} kobo). Overpayment must be approved with an owner reason.`);
+  }
   const balanceKobo = invoice.totalKobo > paidToDateKobo ? invoice.totalKobo - paidToDateKobo : 0n;
 
   const receiptStatus: 'PART PAYMENT' | 'PAID IN FULL' =

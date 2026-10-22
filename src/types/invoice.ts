@@ -102,5 +102,6 @@ export interface GenerateReceiptInput {
   paymentMethod: 'manual_transfer' | 'paystack' | 'bank_deposit';
   amountReceivedKobo: bigint;
   isDeliveryTimeframeConfirmed: boolean;
+  overpaymentReason?: string;
   actorUserId?: string;
 }

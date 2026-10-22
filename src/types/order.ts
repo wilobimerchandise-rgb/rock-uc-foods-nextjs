@@ -55,6 +55,7 @@ export interface Order {
   paymentVerifiedAt?: string;
   paymentVerifiedBy?: string;
   paymentReference?: string;
+  trackingToken?: string;
   createdAt: string;
   updatedAt: string;
   items: OrderItemSnapshot[];
