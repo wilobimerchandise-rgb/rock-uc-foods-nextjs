@@ -14,14 +14,18 @@ import { OwnerMenuEditor } from './components/menu/OwnerMenuEditor';
 import { OrderTrackingView } from './components/order/OrderTrackingView';
 import { StaffOrderManager } from './components/order/StaffOrderManager';
 import { StaffCateringManager } from './components/catering/StaffCateringManager';
+import { EstimatorClient } from './components/EstimatorClient';
+import { EstimatorAdminClient } from './components/EstimatorAdminClient';
+import { ReconciliationManager } from './components/payment/ReconciliationManager';
+import { MfaSetupCard } from './components/security/MfaSetupCard';
 import { RucLogo } from './components/brand/RucLogo';
 import { CartProvider } from './order/cartContext';
 import { Order } from './types/order';
-import { Home, UtensilsCrossed, Package, Settings2, ClipboardList, CalendarDays } from 'lucide-react';
+import { Home, UtensilsCrossed, Package, Settings2, ClipboardList, CalendarDays, Calculator, DollarSign, ShieldCheck } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'home' | 'menu' | 'track' | 'admin'>('home');
-  const [adminSubTab, setAdminSubTab] = useState<'orders' | 'catering' | 'menu'>('orders');
+  const [activeTab, setActiveTab] = useState<'home' | 'menu' | 'estimate' | 'track' | 'admin'>('home');
+  const [adminSubTab, setAdminSubTab] = useState<'orders' | 'catering' | 'estimator' | 'reconciliation' | 'security' | 'menu'>('orders');
   const [currentRole, setCurrentRole] = useState<'owner' | 'staff' | 'developer'>('owner');
   const [trackedOrder, setTrackedOrder] = useState<Order | undefined>(undefined);
 
@@ -69,6 +73,18 @@ export default function App() {
               >
                 <UtensilsCrossed className="w-3.5 h-3.5" />
                 <span>Menu</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('estimate')}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  activeTab === 'estimate'
+                    ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40 shadow'
+                    : 'bg-black/30 text-[#F7EFD9]/60 hover:text-white'
+                }`}
+              >
+                <Calculator className="w-3.5 h-3.5 text-[#D4AF37]" />
+                <span className="hidden sm:inline">Catering Estimator</span>
               </button>
 
               <button
@@ -125,6 +141,12 @@ export default function App() {
             <PublicMenu onOrderPlaced={handleOrderPlaced} />
           )}
 
+          {activeTab === 'estimate' && (
+            <div className="bg-[#FDFBF7] text-[#0B0A09]">
+              <EstimatorClient />
+            </div>
+          )}
+
           {activeTab === 'track' && (
             <OrderTrackingView
               initialOrder={trackedOrder}
@@ -157,6 +179,36 @@ export default function App() {
                   <CalendarDays className="w-3.5 h-3.5 text-[#D4AF37]" /> Events &amp; Invoices
                 </button>
                 <button
+                  onClick={() => setAdminSubTab('estimator')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                    adminSubTab === 'estimator'
+                      ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <Calculator className="w-3.5 h-3.5 text-[#D4AF37]" /> Estimator Pricing
+                </button>
+                <button
+                  onClick={() => setAdminSubTab('reconciliation')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                    adminSubTab === 'reconciliation'
+                      ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Bank Reconciliation
+                </button>
+                <button
+                  onClick={() => setAdminSubTab('security')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                    adminSubTab === 'security'
+                      ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> Security &amp; MFA
+                </button>
+                <button
                   onClick={() => setAdminSubTab('menu')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
                     adminSubTab === 'menu'
@@ -180,6 +232,22 @@ export default function App() {
                   currentUserRole={currentRole}
                   currentUserId={`usr-${currentRole}-01`}
                 />
+              )}
+
+              {adminSubTab === 'estimator' && (
+                <div className="bg-white rounded-2xl p-4 text-[#0B0A09] border border-white/20">
+                  <EstimatorAdminClient />
+                </div>
+              )}
+
+              {adminSubTab === 'reconciliation' && (
+                <div className="bg-[#17120F]/90 rounded-2xl p-4 border border-white/10">
+                  <ReconciliationManager />
+                </div>
+              )}
+
+              {adminSubTab === 'security' && (
+                <MfaSetupCard />
               )}
 
               {adminSubTab === 'menu' && (

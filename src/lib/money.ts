@@ -5,8 +5,23 @@
  * Display strictly with the Naira sign U+20A6 (₦). Never 'NGN'.
  */
 
-export const MAX_KOBO = 100_000_000_000n; // ₦1,000,000,000.00 (One Billion Naira)
+export const MAX_KOBO = 10_000_000_000n; // ₦100,000,000.00 (100 Million Naira per Section 18.2)
 export const NAIRA_SYMBOL = '\u20A6'; // ₦
+
+export function lineTotal(unitPriceKobo: bigint, quantity: number | bigint): bigint {
+  return unitPriceKobo * BigInt(quantity);
+}
+
+export function splitDeposit(totalKobo: bigint, depositBps: number = 7000): { depositKobo: bigint; balanceKobo: bigint } {
+  if (totalKobo < 0n) {
+    throw new Error('Total kobo cannot be negative.');
+  }
+  const depositKobo = applyPercentRoundHalfUp(totalKobo, depositBps);
+  const balanceKobo = totalKobo - depositKobo;
+  return { depositKobo, balanceKobo };
+}
+
+export const formatKobo = formatNaira;
 
 /**
  * Formats a BigInt kobo amount into an official Naira string.

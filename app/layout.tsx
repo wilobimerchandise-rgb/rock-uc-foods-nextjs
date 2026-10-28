@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import './globals.css'; // Global styles
+import { AssistantWidget } from '@/src/components/AssistantWidget';
 
 export const metadata: Metadata = {
   title: 'ROCK UC FOODS | Taste the Luxury',
@@ -18,8 +19,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en">
-      <body suppressHydrationWarning>{children}</body>
+    <html lang="en-NG">
+      <body suppressHydrationWarning>
+        {children}
+        <AssistantWidget />
+      </body>
     </html>
   );
 }
