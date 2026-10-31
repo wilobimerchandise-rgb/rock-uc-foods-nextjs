@@ -10,6 +10,7 @@ import { Order, OrderStatus } from '../../types/order';
 import { formatNaira } from '../../lib/money';
 import { BUSINESS_CONTACT, ALLERGEN_NOTICE, PAYMENT_VERIFICATION_FRAUD_RULE } from '../../policy/content';
 import { orderRepository } from '../../order/orderRepository';
+import { NotificationHistoryDrawer } from '../notifications/NotificationHistoryDrawer';
 import {
   CheckCircle2,
   Clock,
@@ -358,6 +359,9 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({
             )}
           </div>
         </div>
+
+        {/* Live Dispatched Alerts History */}
+        <NotificationHistoryDrawer orderId={currentOrder.id} />
 
         {/* Allergen Reminder Footer */}
         <div className="p-3 bg-[#0B0A09] border border-white/5 rounded-lg text-[10px] text-white/60 flex items-start gap-2">

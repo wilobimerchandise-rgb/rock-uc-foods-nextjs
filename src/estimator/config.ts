@@ -141,6 +141,8 @@ export function serializeEstimatorConfig(config: EstimatorConfig): EstimatorConf
     })),
     serviceRates: {
       serviceChargeBps: config.serviceRates.serviceChargeBps,
+      flatServiceChargeKobo: config.serviceRates.flatServiceChargeKobo?.toString(),
+      perGuestServiceChargeKobo: config.serviceRates.perGuestServiceChargeKobo?.toString(),
       baseLogisticsKobo: config.serviceRates.baseLogisticsKobo.toString(),
       minDepositBps: config.serviceRates.minDepositBps,
     },
@@ -172,6 +174,8 @@ export function deserializeEstimatorConfig(json: EstimatorConfigJson): Estimator
     })),
     serviceRates: {
       serviceChargeBps: json.serviceRates.serviceChargeBps,
+      flatServiceChargeKobo: json.serviceRates.flatServiceChargeKobo ? BigInt(json.serviceRates.flatServiceChargeKobo) : undefined,
+      perGuestServiceChargeKobo: json.serviceRates.perGuestServiceChargeKobo ? BigInt(json.serviceRates.perGuestServiceChargeKobo) : undefined,
       baseLogisticsKobo: BigInt(json.serviceRates.baseLogisticsKobo),
       minDepositBps: json.serviceRates.minDepositBps,
     },

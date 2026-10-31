@@ -278,15 +278,22 @@ export function assignRiderToOrder(params: {
  * Confirms order delivery upon handoff to customer.
  */
 export function confirmDelivery(params: {
-  dispatchId: string;
+  dispatchId?: string;
+  orderId?: string;
   deliveredAt?: string;
   customerSignatureConfirmed?: boolean;
 }): DispatchAssignment {
-  const { dispatchId, deliveredAt = new Date().toISOString(), customerSignatureConfirmed = true } = params;
+  const { dispatchId, orderId, deliveredAt = new Date().toISOString(), customerSignatureConfirmed = true } = params;
 
-  const assignment = dispatchRepository.getById(dispatchId);
+  let assignment: DispatchAssignment | undefined;
+  if (dispatchId) {
+    assignment = dispatchRepository.getById(dispatchId);
+  } else if (orderId) {
+    assignment = dispatchRepository.getByOrderId(orderId);
+  }
+
   if (!assignment) {
-    throw new Error(`Dispatch assignment '${dispatchId}' not found.`);
+    throw new Error(`Dispatch assignment '${dispatchId || orderId}' not found.`);
   }
 
   if (assignment.dispatchStatus === 'delivered') {

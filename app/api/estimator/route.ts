@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getEstimatorConfig,
@@ -7,6 +8,7 @@ import {
 import { computeEstimate } from '@/src/estimator/compute';
 import { updateEstimatorConfig, ConcurrencyError, ValidationError } from '@/src/estimator/editor';
 import { formatNaira } from '@/src/lib/money';
+import { estimateRepository } from '@/src/invoices/repository';
 
 export async function GET() {
   try {
@@ -45,7 +47,33 @@ export async function POST(req: NextRequest) {
       config
     );
 
+    const estimateId = `est-${crypto.randomUUID()}`;
+    const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days validity
+
+    estimateRepository.save({
+      id: estimateId,
+      configVersion: config.version,
+      inputs: {
+        packageId: tierId,
+        guests: guestCount,
+        addOnIds: (selectedAddOns || []).map((a: any) => a.addOnId),
+      },
+      result: {
+        foodSubtotalKobo: result.foodSubtotalKobo.toString(),
+        addOnsSubtotalKobo: result.addOnsSubtotalKobo.toString(),
+        serviceChargeKobo: result.serviceChargeKobo.toString(),
+        logisticsKobo: result.logisticsKobo.toString(),
+        grandTotalKobo: result.grandTotalKobo.toString(),
+        depositKobo: result.depositKobo.toString(),
+        balanceKobo: result.balanceKobo.toString(),
+      },
+      createdAt: new Date().toISOString(),
+      validUntil,
+    });
+
     return NextResponse.json({
+      estimateId,
+      validUntil,
       result: {
         tier: {
           id: result.tier.id,

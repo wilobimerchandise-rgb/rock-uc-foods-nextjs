@@ -18,14 +18,18 @@ import { EstimatorClient } from './components/EstimatorClient';
 import { EstimatorAdminClient } from './components/EstimatorAdminClient';
 import { ReconciliationManager } from './components/payment/ReconciliationManager';
 import { MfaSetupCard } from './components/security/MfaSetupCard';
+import { NotificationOutboxDashboard } from './components/notifications/NotificationOutboxDashboard';
+import { KitchenDisplayDashboard } from './components/kds/KitchenDisplayDashboard';
+import { DispatchManagerDashboard } from './components/dispatch/DispatchManagerDashboard';
+import { PromotionsAndReportsManager } from './components/promotions/PromotionsAndReportsManager';
 import { RucLogo } from './components/brand/RucLogo';
 import { CartProvider } from './order/cartContext';
 import { Order } from './types/order';
-import { Home, UtensilsCrossed, Package, Settings2, ClipboardList, CalendarDays, Calculator, DollarSign, ShieldCheck } from 'lucide-react';
+import { Home, UtensilsCrossed, Package, Settings2, ClipboardList, CalendarDays, Calculator, DollarSign, ShieldCheck, Bell, ChefHat, Truck, TrendingUp } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'menu' | 'estimate' | 'track' | 'admin'>('home');
-  const [adminSubTab, setAdminSubTab] = useState<'orders' | 'catering' | 'estimator' | 'reconciliation' | 'security' | 'menu'>('orders');
+  const [adminSubTab, setAdminSubTab] = useState<'orders' | 'kds' | 'dispatch' | 'catering' | 'estimator' | 'reconciliation' | 'security' | 'notifications' | 'reports' | 'menu'>('orders');
   const [currentRole, setCurrentRole] = useState<'owner' | 'staff' | 'developer'>('owner');
   const [trackedOrder, setTrackedOrder] = useState<Order | undefined>(undefined);
 
@@ -169,6 +173,26 @@ export default function App() {
                   <ClipboardList className="w-3.5 h-3.5" /> Live Orders
                 </button>
                 <button
+                  onClick={() => setAdminSubTab('kds')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                    adminSubTab === 'kds'
+                      ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <ChefHat className="w-3.5 h-3.5 text-[#D4AF37]" /> Kitchen (KDS)
+                </button>
+                <button
+                  onClick={() => setAdminSubTab('dispatch')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                    adminSubTab === 'dispatch'
+                      ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <Truck className="w-3.5 h-3.5 text-[#D4AF37]" /> Rider Dispatch
+                </button>
+                <button
                   onClick={() => setAdminSubTab('catering')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
                     adminSubTab === 'catering'
@@ -209,6 +233,26 @@ export default function App() {
                   <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> Security &amp; MFA
                 </button>
                 <button
+                  onClick={() => setAdminSubTab('notifications')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                    adminSubTab === 'notifications'
+                      ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <Bell className="w-3.5 h-3.5 text-[#D4AF37]" /> Alerts Outbox
+                </button>
+                <button
+                  onClick={() => setAdminSubTab('reports')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                    adminSubTab === 'reports'
+                      ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5 text-[#D4AF37]" /> Reports &amp; Promos
+                </button>
+                <button
                   onClick={() => setAdminSubTab('menu')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
                     adminSubTab === 'menu'
@@ -225,6 +269,14 @@ export default function App() {
                   currentUserRole={currentRole}
                   currentUserId={`usr-${currentRole}-01`}
                 />
+              )}
+
+              {adminSubTab === 'kds' && (
+                <KitchenDisplayDashboard />
+              )}
+
+              {adminSubTab === 'dispatch' && (
+                <DispatchManagerDashboard />
               )}
 
               {adminSubTab === 'catering' && (
@@ -248,6 +300,14 @@ export default function App() {
 
               {adminSubTab === 'security' && (
                 <MfaSetupCard />
+              )}
+
+              {adminSubTab === 'notifications' && (
+                <NotificationOutboxDashboard />
+              )}
+
+              {adminSubTab === 'reports' && (
+                <PromotionsAndReportsManager />
               )}
 
               {adminSubTab === 'menu' && (

@@ -68,11 +68,23 @@ export function validateEstimatorConfig(
   }
 
   // 3. Validate Service Rates
-  if (
-    serviceRates.serviceChargeBps < 0 ||
-    serviceRates.serviceChargeBps > 3000
-  ) {
-    throw new ValidationError('Service charge must be between 0% and 30% (0 - 3000 bps).');
+  if (serviceRates.serviceChargeBps !== undefined) {
+    if (
+      !Number.isInteger(serviceRates.serviceChargeBps) ||
+      serviceRates.serviceChargeBps < 0 ||
+      serviceRates.serviceChargeBps > 3000
+    ) {
+      throw new ValidationError('Service charge must be between 0% and 30% (0 - 3000 bps).');
+    }
+  }
+
+  const hasBps = serviceRates.serviceChargeBps !== undefined && serviceRates.serviceChargeBps > 0;
+  const hasFlatOrPerGuest =
+    (serviceRates.flatServiceChargeKobo !== undefined && serviceRates.flatServiceChargeKobo > 0n) ||
+    (serviceRates.perGuestServiceChargeKobo !== undefined && serviceRates.perGuestServiceChargeKobo > 0n);
+
+  if (hasBps && hasFlatOrPerGuest) {
+    throw new ValidationError('A config may use either percentage service charge or flat/per-guest service charge, not both.');
   }
 
   if (serviceRates.baseLogisticsKobo < 0n) {

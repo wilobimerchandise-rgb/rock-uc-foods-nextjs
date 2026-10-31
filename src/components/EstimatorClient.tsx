@@ -33,6 +33,13 @@ export function EstimatorClient() {
     'addon-tableware': 1,
   });
 
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [isRequestingInvoice, setIsRequestingInvoice] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestedRef, setRequestedRef] = useState<string | null>(null);
+
   const config = useMemo(() => {
     return {
       id: 'default',
@@ -113,6 +120,58 @@ export function EstimatorClient() {
     const encoded = encodeURIComponent(lines.join('\n'));
     return `https://wa.me/2348033729125?text=${encoded}`;
   }, [estimateResult]);
+
+  const handleRequestInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!estimateResult || isRequestingInvoice) return;
+    setIsRequestingInvoice(true);
+    setRequestError(null);
+
+    try {
+      const addOnInputs = Object.entries(selectedAddOnMap)
+        .filter(([_, qty]) => qty > 0)
+        .map(([addOnId, quantity]) => ({ addOnId, quantity }));
+
+      const estRes = await fetch('/api/estimator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tierId: activeTier.id,
+          guestCount,
+          selectedAddOns: addOnInputs,
+        }),
+      });
+
+      const estData = await estRes.json();
+      if (!estRes.ok) {
+        throw new Error(estData.error || 'Failed to generate estimate record.');
+      }
+
+      const invRes = await fetch('/api/invoice/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estimateId: estData.estimateId,
+          contact: {
+            name: contactName.trim(),
+            phone: contactPhone.trim(),
+            email: contactEmail.trim() || undefined,
+          },
+        }),
+      });
+
+      const invData = await invRes.json();
+      if (!invRes.ok) {
+        throw new Error(invData.error || 'Failed to request draft invoice.');
+      }
+
+      setRequestedRef(invData.publicRef);
+    } catch (err: any) {
+      setRequestError(err.message || 'An error occurred while requesting your invoice.');
+    } finally {
+      setIsRequestingInvoice(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
@@ -357,20 +416,79 @@ export function EstimatorClient() {
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="pt-3">
-                <a
-                  href={whatsappQuoteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3.5 px-4 bg-[#1E7E34] hover:bg-[#155724] text-[#FFFFFF] font-bold text-sm rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-colors"
-                >
-                  <span>Submit Estimate via WhatsApp</span>
-                  <ExternalLink className="w-4 h-4 ml-1" />
-                </a>
-                <p className="text-[11px] text-center text-[#5A504B] mt-2">
-                  Opens directly with Chef Esther. An official invoice with 70/30 bank details will follow.
-                </p>
+              {/* Phase 1D: Request Official Invoice & WhatsApp Handoff */}
+              <div className="pt-3 border-t border-[#E5E0D8] space-y-3">
+                {requestedRef ? (
+                  <div className="p-4 bg-emerald-50 border border-emerald-500/50 rounded-xl space-y-3 text-center">
+                    <div className="text-xs font-bold text-emerald-800">
+                      Request sent. Reference {requestedRef}
+                    </div>
+                    <p className="text-[11px] text-emerald-700">
+                      Your draft invoice has been submitted to Chef Esther for review. You can message her directly on WhatsApp:
+                    </p>
+                    <a
+                      href={`https://wa.me/2348033729125?text=${encodeURIComponent(
+                        `Hello Chef Esther, I requested an official invoice. Reference: ${requestedRef}, Guests: ${guestCount}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 px-4 bg-[#1E7E34] hover:bg-[#155724] text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-2 shadow transition-colors"
+                    >
+                      <span>Message Chef Esther on WhatsApp</span>
+                      <ExternalLink className="w-4 h-4 ml-1" />
+                    </a>
+                  </div>
+                ) : (
+                  <form onSubmit={handleRequestInvoice} className="space-y-2.5 text-xs">
+                    <span className="font-bold text-[#0B0A09] block">
+                      Request Official Invoice (Draft)
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Your Full Name *"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg text-[#0B0A09] focus:outline-none focus:border-[#6B1230]"
+                    />
+                    <input
+                      type="tel"
+                      required
+                      placeholder="Phone (e.g. 08033729125 or +234...) *"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg text-[#0B0A09] focus:outline-none focus:border-[#6B1230]"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email Address (Optional)"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      className="w-full px-3 py-2 border border-[#E5E0D8] rounded-lg text-[#0B0A09] focus:outline-none focus:border-[#6B1230]"
+                    />
+
+                    {requestError && (
+                      <div className="p-2 bg-rose-50 border border-rose-300 rounded text-rose-700 text-[11px]">
+                        {requestError}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={isRequestingInvoice || !estimateResult}
+                      className={`w-full py-3 px-4 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-colors ${
+                        isRequestingInvoice || !estimateResult
+                          ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
+                          : 'bg-[#6B1230] hover:bg-[#85163C] text-white'
+                      }`}
+                    >
+                      <span>{isRequestingInvoice ? 'Requesting...' : 'Request Official Invoice'}</span>
+                    </button>
+                    <p className="text-[10px] text-center text-[#5A504B]">
+                      Submits your quote to Chef Esther for review. Payment instructions are issued only after review.
+                    </p>
+                  </form>
+                )}
               </div>
             </div>
           </div>

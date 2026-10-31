@@ -55,6 +55,8 @@ export interface Order {
   paymentVerifiedAt?: string;
   paymentVerifiedBy?: string;
   paymentReference?: string;
+  discountKobo?: bigint;
+  promoCodeId?: string;
   trackingToken?: string;
   createdAt: string;
   updatedAt: string;
@@ -76,5 +78,7 @@ export interface CreateOrderInput {
   specialInstructions?: string;
   acceptedPolicy: boolean;
   policyVersion: string;
+  promoCodeId?: string;
+  discountKobo?: bigint;
   items: CartItemInput[];
 }

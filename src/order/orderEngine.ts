@@ -109,7 +109,12 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
     throw new Error('Order subtotal must be greater than zero.');
   }
 
-  const totalKobo = subtotalKobo + deliveryFeeKobo;
+  let discountKobo = 0n;
+  if (input.discountKobo && input.discountKobo > 0n) {
+    discountKobo = input.discountKobo > subtotalKobo ? subtotalKobo : input.discountKobo;
+  }
+
+  const totalKobo = (subtotalKobo - discountKobo) + deliveryFeeKobo;
   const nowIso = new Date().toISOString();
 
   const newOrder: Order = {
@@ -123,6 +128,8 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
     deliveryAddress: input.deliveryType === 'delivery' ? input.deliveryAddress?.trim() : undefined,
     deliveryFeeKobo,
     subtotalKobo,
+    discountKobo: discountKobo > 0n ? discountKobo : undefined,
+    promoCodeId: input.promoCodeId,
     totalKobo,
     status: 'pending_payment',
     specialInstructions: input.specialInstructions ? input.specialInstructions.trim() : undefined,

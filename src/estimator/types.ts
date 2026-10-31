@@ -23,7 +23,10 @@ export interface EstimatorAddOn {
 }
 
 export interface EstimatorServiceRates {
-  serviceChargeBps: number; // basis points, e.g. 1000 = 10%
+  serviceChargeBps?: number; // basis points, e.g. 1000 = 10% (0 to 3000)
+  foodOnlyServiceCharge?: boolean;
+  flatServiceChargeKobo?: bigint;
+  perGuestServiceChargeKobo?: bigint;
   baseLogisticsKobo: bigint;
   minDepositBps: number;    // e.g. 7000 = 70%
 }
@@ -89,7 +92,9 @@ export interface EstimatorConfigJson {
     maxQuantity?: number;
   }>;
   serviceRates: {
-    serviceChargeBps: number;
+    serviceChargeBps?: number;
+    flatServiceChargeKobo?: string;
+    perGuestServiceChargeKobo?: string;
     baseLogisticsKobo: string;
     minDepositBps: number;
   };

@@ -55,7 +55,25 @@ export function EstimatorAdminClient() {
   };
 
   useEffect(() => {
-    fetchConfig();
+    let ignore = false;
+    fetch('/api/estimator')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!ignore) {
+          if (data.config) setConfig(data.config);
+          else setStatusMessage({ type: 'error', text: data.error || 'Failed to load configuration.' });
+        }
+      })
+      .catch(() => {
+        if (!ignore) setStatusMessage({ type: 'error', text: 'Network error fetching configuration.' });
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleTierChange = (index: number, field: string, value: any) => {
@@ -233,7 +251,7 @@ export function EstimatorAdminClient() {
                   step="0.5"
                   min="0"
                   max="30"
-                  value={config.serviceRates.serviceChargeBps / 100}
+                  value={(config.serviceRates.serviceChargeBps ?? 0) / 100}
                   onChange={(e) =>
                     handleServiceRateChange(
                       'serviceChargeBps',

@@ -52,7 +52,28 @@ export function MfaSetupCard() {
   };
 
   useEffect(() => {
-    fetchStatus();
+    let ignore = false;
+    fetch('/api/security/mfa?userId=usr-owner-01')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!ignore) {
+          setIsEnabled(data.isEnabled);
+          if (data.isEnabled) {
+            setBackupCount(data.backupCodesRemaining || 0);
+          } else {
+            setSetupSecret(data.setupSecret);
+            setOtpauthUri(data.otpauthUri);
+            setBackupCodes(data.backupCodes || []);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleCopySecret = () => {

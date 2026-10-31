@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   ShieldCheck,
   Building2,
+  Tag,
 } from 'lucide-react';
 
 interface CheckoutModalProps {
@@ -57,6 +58,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Promo Code State
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<{
+    id: string;
+    code: string;
+    discountKobo: bigint;
+    description?: string;
+  } | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const cartEntries = Object.entries(cart)
@@ -65,7 +77,50 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const selectedZone = getDeliveryZoneById(selectedZoneId);
   const deliveryFeeKobo = deliveryType === 'collection' ? 0n : (selectedZone?.feeKobo || 0n);
-  const totalKobo = subtotalKobo + deliveryFeeKobo;
+  const discountKobo = appliedPromo?.discountKobo || 0n;
+  const totalKobo = (subtotalKobo > discountKobo ? subtotalKobo - discountKobo : 0n) + deliveryFeeKobo;
+
+  const handleApplyPromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoCodeInput.trim()) return;
+
+    setPromoLoading(true);
+    setPromoError(null);
+
+    try {
+      const res = await fetch('/api/promotions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'validate',
+          code: promoCodeInput.trim(),
+          subtotalKobo: subtotalKobo.toString(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.isValid) {
+        setPromoError(data.reason || data.error || 'Invalid or expired promo code.');
+      } else {
+        setAppliedPromo({
+          id: data.promoCode.id,
+          code: data.promoCode.code,
+          discountKobo: BigInt(data.discountKobo),
+          description: data.promoCode.description,
+        });
+        setPromoCodeInput('');
+      }
+    } catch (err: any) {
+      setPromoError(err.message || 'Failed to validate promo code.');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoError(null);
+  };
 
   const handleSubmitOrder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +148,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         specialInstructions: specialInstructions || undefined,
         acceptedPolicy,
         policyVersion: POLICY_VERSION,
+        promoCodeId: appliedPromo ? appliedPromo.id : undefined,
+        discountKobo: discountKobo > 0n ? discountKobo : undefined,
         items: cartEntries.map((e) => ({
           menuItemId: e.item.id,
           quantity: e.quantity,
@@ -400,12 +457,68 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </label>
           </div>
 
-          {/* 8. Financial Reconciliation Summary */}
+          {/* 8. Promo Code & Voucher Section */}
+          <div className="p-3 bg-[#17120F] border border-white/10 rounded-xl space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#D4AF37]">
+              <Tag className="w-3.5 h-3.5" />
+              <span>Apply Promo Code or Voucher</span>
+            </div>
+
+            {appliedPromo ? (
+              <div className="flex items-center justify-between p-2.5 bg-emerald-950/40 border border-emerald-500/50 rounded-lg text-xs">
+                <div>
+                  <span className="font-mono font-bold text-emerald-300 mr-2">
+                    {appliedPromo.code}
+                  </span>
+                  <span className="text-[11px] text-emerald-400">
+                    (-{formatNaira(appliedPromo.discountKobo)} applied)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemovePromo}
+                  className="text-stone-400 hover:text-rose-400 text-[11px] font-semibold"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. WELCOME10"
+                  value={promoCodeInput}
+                  onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                  className="flex-1 bg-[#0B0A09] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-[#F7EFD9] uppercase placeholder-stone-600 focus:outline-none focus:border-[#D4AF37]"
+                />
+                <button
+                  type="button"
+                  disabled={!promoCodeInput.trim() || promoLoading}
+                  onClick={handleApplyPromo}
+                  className="px-4 py-2 bg-[#6B1230] hover:bg-[#85163C] text-white border border-[#D4AF37]/50 rounded-lg text-xs font-bold transition-all disabled:opacity-40"
+                >
+                  {promoLoading ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+            )}
+
+            {promoError && (
+              <p className="text-[11px] text-rose-400 pl-1">{promoError}</p>
+            )}
+          </div>
+
+          {/* 9. Financial Reconciliation Summary */}
           <div className="p-4 bg-[#0B0A09] rounded-xl border border-white/10 space-y-1.5 font-mono text-xs">
             <div className="flex justify-between text-white/70">
               <span>Food Subtotal:</span>
               <span>{formatNaira(subtotalKobo)}</span>
             </div>
+            {discountKobo > 0n && (
+              <div className="flex justify-between text-emerald-400 font-semibold">
+                <span>Promo Discount ({appliedPromo?.code}):</span>
+                <span>-{formatNaira(discountKobo)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-white/70">
               <span>Delivery Fee ({deliveryType === 'collection' ? 'Collection' : selectedZone?.name || 'Lagos'}):</span>
               <span>{formatNaira(deliveryFeeKobo)}</span>

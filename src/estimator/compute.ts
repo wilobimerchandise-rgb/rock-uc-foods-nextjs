@@ -67,17 +67,27 @@ export function computeEstimate(
     addOnsSubtotalKobo += itemTotalKobo;
   }
 
-  // 5. Service Charge (e.g. 1000 bps = 10%)
-  const chargeableSubtotal = foodSubtotalKobo + addOnsSubtotalKobo;
-  const serviceChargeKobo = applyPercentRoundHalfUp(
-    chargeableSubtotal,
-    config.serviceRates.serviceChargeBps
-  );
+  // 5. Service Charge (applied to FOOD SUBTOTAL ONLY if foodOnlyServiceCharge configured, or flat / per-guest)
+  let serviceChargeKobo = 0n;
+  if (config.serviceRates.serviceChargeBps !== undefined && config.serviceRates.serviceChargeBps > 0) {
+    const baseKobo = config.serviceRates.foodOnlyServiceCharge
+      ? foodSubtotalKobo
+      : (foodSubtotalKobo + addOnsSubtotalKobo);
+    serviceChargeKobo = applyPercentRoundHalfUp(
+      baseKobo,
+      config.serviceRates.serviceChargeBps
+    );
+  } else if (config.serviceRates.flatServiceChargeKobo !== undefined && config.serviceRates.flatServiceChargeKobo > 0n) {
+    serviceChargeKobo = config.serviceRates.flatServiceChargeKobo;
+  } else if (config.serviceRates.perGuestServiceChargeKobo !== undefined && config.serviceRates.perGuestServiceChargeKobo > 0n) {
+    serviceChargeKobo = config.serviceRates.perGuestServiceChargeKobo * BigInt(guestCount);
+  }
 
   // 6. Logistics
   const logisticsKobo = config.serviceRates.baseLogisticsKobo;
 
   // 7. Grand Total
+  const chargeableSubtotal = foodSubtotalKobo + addOnsSubtotalKobo;
   const grandTotalKobo = chargeableSubtotal + serviceChargeKobo + logisticsKobo;
 
   // 8. Ceiling Enforcement: MAX_KOBO = ₦100,000,000.00
