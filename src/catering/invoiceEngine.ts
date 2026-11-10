@@ -133,6 +133,10 @@ class InvoiceRepository {
     return undefined;
   }
 
+  getAllInvoices(): Invoice[] {
+    return Array.from(this.invoices.values());
+  }
+
   saveReceipt(receipt: Receipt): Receipt {
     this.receipts.set(receipt.id, { ...receipt });
     return receipt;

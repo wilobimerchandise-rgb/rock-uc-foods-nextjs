@@ -28,7 +28,7 @@ export interface StoredEstimate {
   validUntil: string;
 }
 
-export type InvoiceStatus = 'draft' | 'issued' | 'void';
+export type InvoiceStatus = 'draft' | 'issued' | 'void' | 'superseded';
 
 export interface InvoiceLineItem {
   name: string;
@@ -53,6 +53,30 @@ export interface StoredInvoice {
   createdAt: string;
   label?: string; // e.g. 'Needs team confirmation' for 21+ guests
   voidReason?: string;
+  revisedAt?: string;
+  revisedBy?: string;
+  revisionReason?: string;
+}
+
+export interface InvoiceVersionRecord {
+  id: string;
+  invoiceId: string;
+  revision: number;
+  publicRef: string;
+  snapshot: StoredInvoice;
+  reason: string;
+  changedBy: string;
+  changedAt: string;
+}
+
+export interface InvoiceRevisionInput {
+  reason: string;
+  inputs: {
+    packageId: string;
+    guests: number;
+    zoneId?: string;
+    addOnIds?: string[];
+  };
 }
 
 export interface InvoiceContactInput {
@@ -60,3 +84,21 @@ export interface InvoiceContactInput {
   phone: string;
   email?: string;
 }
+
+export interface StoredInvoiceLink {
+  id: string;
+  invoiceId: string;
+  tokenHash: string; // 64-char SHA-256 hex string, never raw token
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+}
+
+export interface InvoiceSharePayload {
+  url?: string;
+  message: string;
+  phoneProblem: boolean;
+  expiresAt: string;
+}
+

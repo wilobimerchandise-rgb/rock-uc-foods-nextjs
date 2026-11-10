@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { MessageSquare, X, Send, ExternalLink, Bot, User } from 'lucide-react';
 import { AssistantReply } from '../assistant/types';
 import { BUSINESS_CONTACT } from '../policy/content';
@@ -24,6 +25,7 @@ interface ChatMessage {
 }
 
 export function AssistantWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,6 +47,18 @@ export function AssistantWidget() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
+
+  // Playbook Phase 2C Section 30: Do not render chat button at all on /login, /login/mfa, or any /admin route
+  const isSuppressed =
+    Boolean(pathname) &&
+    (pathname === '/login' ||
+      pathname.startsWith('/login/') ||
+      pathname === '/admin' ||
+      pathname.startsWith('/admin/'));
+
+  if (isSuppressed) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,13 +110,17 @@ export function AssistantWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div 
+      className="fixed z-50 pointer-events-none bottom-[calc(72px+env(safe-area-inset-bottom,0px))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-[calc(1rem+env(safe-area-inset-right,0px))] md:right-[calc(1.25rem+env(safe-area-inset-right,0px))]"
+    >
+
       {/* Floating Action Button */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           aria-label="Open chat with our AI assistant"
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#6B1230] text-[#F7EFD9] shadow-2xl border-2 border-[#D4AF37] hover:scale-105 transition-all duration-200"
+          data-testid="floating-assistant-button"
+          className="pointer-events-auto flex items-center justify-center w-14 h-14 rounded-full bg-[#6B1230] text-[#F7EFD9] shadow-2xl border-2 border-[#D4AF37] hover:scale-105 transition-all duration-200"
         >
           <MessageSquare className="w-6 h-6 text-[#D4AF37]" />
         </button>
@@ -110,7 +128,7 @@ export function AssistantWidget() {
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="w-[90vw] sm:w-[380px] h-[520px] bg-[#0B0A09] border border-[#D4AF37] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="pointer-events-auto w-[90vw] sm:w-[380px] h-[520px] max-h-[85vh] bg-[#0B0A09] border border-[#D4AF37] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
           {/* Header */}
           <div className="bg-[#6B1230] p-4 text-[#F7EFD9] flex items-center justify-between border-b border-[#D4AF37]">
             <div className="flex items-center space-x-2">

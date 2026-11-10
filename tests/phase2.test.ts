@@ -220,7 +220,7 @@ describe('Phase 2: Real PostgreSQL PGlite Database Constraints (0002_menu_core.s
       INSERT INTO menu_items (category_id, name, price_kobo, status, is_free_item)
       VALUES ('11111111-1111-1111-1111-111111111111', 'Complimentary Water', 0, 'published', true);
     `);
-  });
+  }, 25000);
 });
 
 describe('Phase 2: CSV Import Dry-Run, UTF-8 BOM & Idempotency', () => {

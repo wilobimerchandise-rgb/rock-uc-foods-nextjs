@@ -15,6 +15,10 @@ export interface CsvDryRunRowCreate {
   priceKobo: bigint;
   portion: string;
   status: string;
+  showHeat?: boolean;
+  availabilityNote?: string;
+  sizeTiers?: Array<{ label: string; priceKobo: bigint }>;
+  optionGroups?: Array<{ name: string; options: Array<{ name: string; priceDeltaKobo: bigint }> }>;
 }
 
 export interface CsvDryRunRowUpdate {
@@ -38,6 +42,15 @@ export interface CsvDryRunResult {
   rowsToUpdate: CsvDryRunRowUpdate[];
   rowsRejected: CsvDryRunRowRejected[];
   isIdempotent: boolean; // true if running commit will change 0 rows
+}
+
+export function normalizeDishName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -73,6 +86,7 @@ export function dryRunMenuCsv(csvText: string): CsvDryRunResult {
   const rowsRejected: CsvDryRunRowRejected[] = [];
 
   const seenCategoryNames = new Set<string>();
+  const seenNormalizedDishNames = new Map<string, Array<{ rowNumber: number; portion: string; rawName: string }>>();
 
   dataLines.forEach((line, index) => {
     const rowNum = index + 2; // 1-indexed accounting for header
@@ -88,14 +102,55 @@ export function dryRunMenuCsv(csvText: string): CsvDryRunResult {
       return;
     }
 
-    const [sku, categoryName, name, description, priceStr, portion, allergensStr, statusStr] = cols;
+    const [
+      sku,
+      categoryName,
+      name,
+      description,
+      priceStr,
+      portion,
+      allergensStr,
+      statusStr,
+      showHeatStr,
+      availabilityNoteStr,
+      sizeTiersStr,
+      optionGroupsStr,
+    ] = cols;
 
     if (!name || name.trim() === '') {
       rowsRejected.push({ rowNumber: rowNum, rawText: line, reason: 'Dish name cannot be blank.' });
       return;
     }
 
-    const catKey = `${categoryName.toLowerCase()}:${name.toLowerCase()}`;
+    if (availabilityNoteStr && availabilityNoteStr.trim().length > 120) {
+      rowsRejected.push({
+        rowNumber: rowNum,
+        rawText: line,
+        reason: `Availability note exceeds 120 characters (got ${availabilityNoteStr.trim().length}).`,
+      });
+      return;
+    }
+
+    // Phase 2A: Global menu duplicate check (names must have distinct size/portion labels)
+    const normName = normalizeDishName(name);
+    const normPortion = (portion || '').trim().toLowerCase();
+    const prevDishes = seenNormalizedDishNames.get(normName);
+    if (prevDishes) {
+      const collision = prevDishes.find((p) => !normPortion || !p.portion || p.portion === normPortion);
+      if (collision) {
+        rowsRejected.push({
+          rowNumber: rowNum,
+          rawText: line,
+          reason: `Duplicate dish name '${name}' found in row ${collision.rowNumber} and row ${rowNum} without distinct portion/size labels.`,
+        });
+        return;
+      }
+      prevDishes.push({ rowNumber: rowNum, portion: normPortion, rawName: name });
+    } else {
+      seenNormalizedDishNames.set(normName, [{ rowNumber: rowNum, portion: normPortion, rawName: name }]);
+    }
+
+    const catKey = `${categoryName.toLowerCase()}:${normName}:${normPortion}`;
     if (seenCategoryNames.has(catKey)) {
       rowsRejected.push({
         rowNumber: rowNum,
@@ -121,10 +176,43 @@ export function dryRunMenuCsv(csvText: string): CsvDryRunResult {
       }
     }
 
-    const status = statusStr?.toLowerCase() === 'published' ? 'published' : 'draft';
+    // Parse size tiers (e.g. "S:1500;M:2500;L:4000")
+    let parsedTiers: Array<{ label: string; priceKobo: bigint }> | undefined;
+    if (sizeTiersStr && sizeTiersStr.trim() !== '') {
+      try {
+        const parts = sizeTiersStr.split(';').map((p) => p.trim()).filter(Boolean);
+        parsedTiers = parts.map((part) => {
+          const [tLabel, tPriceStr] = part.split(':').map((s) => s.trim());
+          if (!tLabel || !tPriceStr) throw new Error(`Invalid tier format '${part}'`);
+          const kobo = parseNairaToKobo(tPriceStr);
+          if (kobo <= 0n) throw new Error('Size tier price must be greater than 0.');
+          return { label: tLabel, priceKobo: kobo };
+        });
+      } catch (err: unknown) {
+        rowsRejected.push({
+          rowNumber: rowNum,
+          rawText: line,
+          reason: `Invalid size tiers '${sizeTiersStr}': ${(err as Error).message}`,
+        });
+        return;
+      }
+    }
 
-    // Price safety: published items cannot have price under 1 kobo
-    if (status === 'published' && parsedKobo < 1n) {
+    // Invariant: An item has either a base price or size tiers, never both
+    if (parsedKobo > 0n && parsedTiers && parsedTiers.length > 0) {
+      rowsRejected.push({
+        rowNumber: rowNum,
+        rawText: line,
+        reason: 'Item cannot have both a base price and size tiers.',
+      });
+      return;
+    }
+
+    const status = statusStr?.toLowerCase() === 'published' ? 'published' : 'draft';
+    const hasTiers = Boolean(parsedTiers && parsedTiers.length > 0);
+
+    // Price safety: published items cannot have price under 1 kobo unless size-tiered
+    if (status === 'published' && parsedKobo < 1n && !hasTiers) {
       rowsRejected.push({
         rowNumber: rowNum,
         rawText: line,
@@ -159,6 +247,9 @@ export function dryRunMenuCsv(csvText: string): CsvDryRunResult {
         priceKobo: parsedKobo,
         portion: portion || 'Serves 1',
         status,
+        showHeat: showHeatStr?.toLowerCase() === 'true' || showHeatStr?.toLowerCase() === 'yes' || showHeatStr === '1',
+        availabilityNote: availabilityNoteStr?.trim() || undefined,
+        sizeTiers: parsedTiers,
       });
     }
   });
@@ -204,6 +295,15 @@ export function commitMenuCsv(
       };
     }
 
+    const tiers = row.sizeTiers?.map((t, idx) => ({
+      id: `tier-${Date.now()}-${idx}`,
+      itemId: '',
+      label: t.label,
+      priceKobo: t.priceKobo,
+      active: true,
+      sortOrder: (idx + 1) * 10,
+    }));
+
     menuRepository.saveItem(
       {
         sku: row.sku,
@@ -212,6 +312,9 @@ export function commitMenuCsv(
         priceKobo: row.priceKobo,
         portionLabel: row.portion,
         status: row.status as 'draft' | 'published',
+        showHeat: row.showHeat ?? false,
+        availabilityNote: row.availabilityNote,
+        sizeTiers: tiers,
       },
       actorId
     );

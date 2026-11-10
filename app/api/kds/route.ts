@@ -14,6 +14,22 @@ import {
 import { orderRepository } from '@/src/order/orderRepository';
 import { sendOrderNotification } from '@/src/notifications/notificationEngine';
 
+function serializeTicket(ticket: any) {
+  if (!ticket) return null;
+  return {
+    ...ticket,
+    items: (ticket.items || []).map((i: any) => ({
+      ...i,
+      unitPriceKoboSnapshot: i.unitPriceKoboSnapshot?.toString(),
+      totalKoboSnapshot: i.totalKoboSnapshot?.toString(),
+      selectedOptionsSnapshot: (i.selectedOptionsSnapshot || []).map((o: any) => ({
+        ...o,
+        priceDeltaKobo: o.priceDeltaKobo ? o.priceDeltaKobo.toString() : '0',
+      })),
+    })),
+  };
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const orderId = searchParams.get('orderId');
@@ -37,7 +53,7 @@ export async function GET(req: NextRequest) {
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
-  return NextResponse.json({ tickets });
+  return NextResponse.json({ tickets: tickets.map(serializeTicket) });
 }
 
 export async function POST(req: NextRequest) {
@@ -51,7 +67,7 @@ export async function POST(req: NextRequest) {
       }
 
       const ticket = createKitchenTicketForOrder(orderId, priority);
-      return NextResponse.json({ success: true, ticket });
+      return NextResponse.json({ success: true, ticket: serializeTicket(ticket) });
     }
 
     if (action === 'start_cooking') {
@@ -68,7 +84,7 @@ export async function POST(req: NextRequest) {
           // Non-blocking notification dispatch
         }
       }
-      return NextResponse.json({ success: true, ticket });
+      return NextResponse.json({ success: true, ticket: serializeTicket(ticket) });
     }
 
     if (action === 'mark_plated') {
@@ -77,7 +93,7 @@ export async function POST(req: NextRequest) {
       }
 
       const ticket = markPlated(ticketId);
-      return NextResponse.json({ success: true, ticket });
+      return NextResponse.json({ success: true, ticket: serializeTicket(ticket) });
     }
 
     if (action === 'mark_handed_off') {
@@ -94,7 +110,7 @@ export async function POST(req: NextRequest) {
           // Non-blocking notification dispatch
         }
       }
-      return NextResponse.json({ success: true, ticket });
+      return NextResponse.json({ success: true, ticket: serializeTicket(ticket) });
     }
 
     return NextResponse.json({ error: `Unknown action: '${action}'` }, { status: 400 });

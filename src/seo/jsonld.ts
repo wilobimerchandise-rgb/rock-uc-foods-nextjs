@@ -57,15 +57,24 @@ export function menuJsonLd(items: MenuItem[]) {
     '@context': 'https://schema.org',
     '@type': 'Menu',
     name: `${BUSINESS_CONTACT.name} Live Menu`,
-    hasMenuItem: published.map((item) => ({
-      '@type': 'MenuItem',
-      name: item.name,
-      description: item.description || '',
-      offers: {
-        '@type': 'Offer',
-        price: schemaPrice(item.priceKobo),
-        priceCurrency: 'NGN', // Schema.org standard ISO currency code for Nigeria
-      },
-    })),
+    hasMenuItem: published.map((item) => {
+      const priceKobo =
+        item.priceKobo > 0n
+          ? item.priceKobo
+          : item.sizeTiers && item.sizeTiers.length > 0
+          ? item.sizeTiers[0].priceKobo
+          : 0n;
+
+      return {
+        '@type': 'MenuItem',
+        name: item.name,
+        description: item.description || '',
+        offers: {
+          '@type': 'Offer',
+          price: schemaPrice(priceKobo),
+          priceCurrency: 'NGN', // Schema.org standard ISO currency code for Nigeria
+        },
+      };
+    }),
   };
 }

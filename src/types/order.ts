@@ -31,6 +31,8 @@ export interface OrderItemSnapshot {
   menuItemId: string;
   nameSnapshot: string;
   portionSnapshot?: string;
+  selectedTierName?: string;
+  selectedOptionsSnapshot?: Array<{ id: string; name: string; priceDeltaKobo: bigint }>;
   unitPriceKoboSnapshot: bigint;
   quantity: number;
   totalKoboSnapshot: bigint;
@@ -58,6 +60,7 @@ export interface Order {
   discountKobo?: bigint;
   promoCodeId?: string;
   trackingToken?: string;
+  expiresAt: string;
   createdAt: string;
   updatedAt: string;
   items: OrderItemSnapshot[];
@@ -66,6 +69,8 @@ export interface Order {
 export interface CartItemInput {
   menuItemId: string;
   quantity: number;
+  selectedTierId?: string;
+  selectedOptionIds?: string[];
 }
 
 export interface CreateOrderInput {

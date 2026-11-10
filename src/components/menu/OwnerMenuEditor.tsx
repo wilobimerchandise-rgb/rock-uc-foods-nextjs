@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ROCK UC FOODS - Mobile-First Owner Menu Editor
  * (Playbook v2 Section 7.A & Decision 2)

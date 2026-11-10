@@ -47,3 +47,26 @@ export function getAuditEvents(): StoredAuditEvent[] {
 export function clearAuditLog(): void {
   auditEventLog.length = 0;
 }
+
+export const auditLogger = {
+  logSecurityAlert(alert: string, details: Record<string, unknown> = {}) {
+    return recordAudit({
+      action: alert,
+      entity: 'security_alert',
+      entityId: String(details.actorId || 'system'),
+      actorId: details.actorId ? String(details.actorId) : undefined,
+      actorRole: details.actorRole ? String(details.actorRole) : undefined,
+      details,
+    });
+  },
+  logEvent(action: string, details: Record<string, unknown> = {}) {
+    return recordAudit({
+      action,
+      entity: 'site_content',
+      entityId: String(details.version || 'unknown'),
+      actorId: details.actorId ? String(details.actorId) : undefined,
+      actorRole: details.actorRole ? String(details.actorRole) : undefined,
+      details,
+    });
+  },
+};

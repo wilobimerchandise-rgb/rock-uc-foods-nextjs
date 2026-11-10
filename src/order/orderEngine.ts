@@ -11,6 +11,7 @@ import { calculateDeliveryFeeKobo } from './deliveryZones';
 import { normalizeNigerianPhone } from '../lib/security';
 import { validatePolicyConsent } from '../policy/consent';
 import { orderRepository } from './orderRepository';
+import { getOrderablePrice } from '../menu/pricing';
 
 /**
  * Generates collision-resistant, non-sequential order tracking codes.
@@ -89,7 +90,14 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
       throw new Error(`Invalid quantity for '${menuItem.name}'. Must be between 1 and 100.`);
     }
 
-    const unitPriceKobo = menuItem.priceKobo;
+    // Authoritative calculation via getOrderablePrice
+    const priced = getOrderablePrice(
+      itemInput.menuItemId,
+      itemInput.selectedOptionIds || [],
+      itemInput.selectedTierId
+    );
+
+    const unitPriceKobo = priced.totalUnitKobo;
     const itemTotalKobo = unitPriceKobo * BigInt(qty);
     subtotalKobo += itemTotalKobo;
 
@@ -99,6 +107,8 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
       menuItemId: menuItem.id,
       nameSnapshot: menuItem.name,
       portionSnapshot: menuItem.portionLabel,
+      selectedTierName: priced.tierName,
+      selectedOptionsSnapshot: priced.optionSnapshots,
       unitPriceKoboSnapshot: unitPriceKobo,
       quantity: qty,
       totalKoboSnapshot: itemTotalKobo,
@@ -115,7 +125,9 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
   }
 
   const totalKobo = (subtotalKobo - discountKobo) + deliveryFeeKobo;
-  const nowIso = new Date().toISOString();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const expiresAtIso = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
 
   const newOrder: Order = {
     id: orderId,
@@ -135,6 +147,7 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
     specialInstructions: input.specialInstructions ? input.specialInstructions.trim() : undefined,
     policyVersion: input.policyVersion,
     policyAcceptedAt: nowIso,
+    expiresAt: expiresAtIso,
     createdAt: nowIso,
     updatedAt: nowIso,
     items: snapshotItems,

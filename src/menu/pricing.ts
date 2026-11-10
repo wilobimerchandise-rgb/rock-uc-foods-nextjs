@@ -21,7 +21,8 @@ export class OrderablePriceError extends Error {
  */
 export function getOrderablePrice(
   itemId: string,
-  selectedOptionIds: string[] = []
+  selectedOptionIds: string[] = [],
+  selectedTierId?: string
 ): OrderablePriceResult {
   const item = menuRepository.getItemById(itemId);
 
@@ -41,9 +42,41 @@ export function getOrderablePrice(
     throw new OrderablePriceError(`Dish '${item.name}' is sold out for today.`);
   }
 
-  // Price safety check: published item price must not be 0 unless isFreeItem === true
-  if (item.priceKobo === 0n && !item.isFreeItem) {
-    throw new OrderablePriceError(`Price safety violation: Dish '${item.name}' has price ₦0.00.`);
+  let basePriceKobo = item.priceKobo;
+  let resolvedTierId: string | undefined;
+  let resolvedTierName: string | undefined;
+
+  // Handle size tiers
+  if (item.sizeTiers && item.sizeTiers.length > 0) {
+    const activeTiers = item.sizeTiers.filter((t) => t.active);
+    if (activeTiers.length === 0) {
+      throw new OrderablePriceError(`Dish '${item.name}' currently has no available size tiers.`);
+    }
+
+    let matchedTier = selectedTierId
+      ? activeTiers.find((t) => t.id === selectedTierId || t.label.toUpperCase() === selectedTierId.trim().toUpperCase())
+      : undefined;
+
+    if (!matchedTier && !selectedTierId && activeTiers.length === 1) {
+      matchedTier = activeTiers[0];
+    }
+
+    if (!matchedTier) {
+      throw new OrderablePriceError(
+        selectedTierId
+          ? `Invalid size tier '${selectedTierId}' for dish '${item.name}'.`
+          : `Please select a size tier for dish '${item.name}'.`
+      );
+    }
+
+    basePriceKobo = matchedTier.priceKobo;
+    resolvedTierId = matchedTier.id;
+    resolvedTierName = matchedTier.label;
+  } else {
+    // Price safety check for standard base-price items
+    if (item.priceKobo === 0n && !item.isFreeItem) {
+      throw new OrderablePriceError(`Price safety violation: Dish '${item.name}' has price ₦0.00.`);
+    }
   }
 
   let optionsTotalKobo = 0n;
@@ -90,12 +123,14 @@ export function getOrderablePrice(
     }
   }
 
-  const totalUnitKobo = item.priceKobo + optionsTotalKobo;
+  const totalUnitKobo = basePriceKobo + optionsTotalKobo;
 
   return {
     itemId: item.id,
     itemName: item.name,
-    basePriceKobo: item.priceKobo,
+    basePriceKobo,
+    tierId: resolvedTierId,
+    tierName: resolvedTierName,
     optionsTotalKobo,
     totalUnitKobo,
     optionSnapshots,

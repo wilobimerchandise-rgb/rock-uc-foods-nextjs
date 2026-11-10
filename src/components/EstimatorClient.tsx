@@ -428,10 +428,11 @@ export function EstimatorClient() {
                     </p>
                     <a
                       href={`https://wa.me/2348033729125?text=${encodeURIComponent(
-                        `Hello Chef Esther, I requested an official invoice. Reference: ${requestedRef}, Guests: ${guestCount}`
+                        `Reference: ${requestedRef}, Guests: ${guestCount}, Review: ${typeof window !== 'undefined' ? window.location.origin : 'https://rockucfoods.com'}/admin/invoices/${requestedRef}`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
+
                       className="w-full py-3 px-4 bg-[#1E7E34] hover:bg-[#155724] text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-2 shadow transition-colors"
                     >
                       <span>Message Chef Esther on WhatsApp</span>

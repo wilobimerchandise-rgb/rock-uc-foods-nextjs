@@ -22,6 +22,7 @@ export function splitDeposit(totalKobo: bigint, depositBps: number = 7000): { de
 }
 
 export const formatKobo = formatNaira;
+export const formatMoneyKobo = formatNaira;
 
 /**
  * Formats a BigInt kobo amount into an official Naira string.

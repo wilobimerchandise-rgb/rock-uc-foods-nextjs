@@ -3,7 +3,7 @@
  * Enforces unique constraints and immutable revisions.
  */
 
-import { StoredEstimate, StoredInvoice } from './types';
+import { StoredEstimate, StoredInvoice, StoredInvoiceLink, InvoiceVersionRecord } from './types';
 
 class EstimateRepository {
   private estimates = new Map<string, StoredEstimate>();
@@ -90,5 +90,86 @@ class InvoiceRepository {
   }
 }
 
+class InvoiceLinksRepository {
+  private links = new Map<string, StoredInvoiceLink>();
+
+  clear() {
+    this.links.clear();
+  }
+
+  createLink(link: StoredInvoiceLink): StoredInvoiceLink {
+    for (const existing of this.links.values()) {
+      if (existing.tokenHash === link.tokenHash) {
+        throw new Error(`Invoice link with tokenHash already exists.`);
+      }
+    }
+    this.links.set(link.id, { ...link });
+    return link;
+  }
+
+  getLinkByTokenHash(tokenHash: string): StoredInvoiceLink | undefined {
+    for (const l of this.links.values()) {
+      if (l.tokenHash === tokenHash) {
+        return { ...l };
+      }
+    }
+    return undefined;
+  }
+
+  getLinksByInvoiceId(invoiceId: string): StoredInvoiceLink[] {
+    const res: StoredInvoiceLink[] = [];
+    for (const l of this.links.values()) {
+      if (l.invoiceId === invoiceId) {
+        res.push({ ...l });
+      }
+    }
+    return res.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  revokeLinksByInvoiceId(invoiceId: string, revokedAt: string = new Date().toISOString()): number {
+    let count = 0;
+    for (const [id, l] of this.links.entries()) {
+      if (l.invoiceId === invoiceId && !l.revokedAt) {
+        this.links.set(id, { ...l, revokedAt });
+        count++;
+      }
+    }
+    return count;
+  }
+
+  getAll(): StoredInvoiceLink[] {
+    return Array.from(this.links.values());
+  }
+}
+
+class InvoiceVersionsRepository {
+  private versions = new Map<string, InvoiceVersionRecord>();
+
+  clear() {
+    this.versions.clear();
+  }
+
+  saveVersion(record: InvoiceVersionRecord): InvoiceVersionRecord {
+    this.versions.set(record.id, { ...record });
+    return record;
+  }
+
+  getVersionsByInvoiceId(invoiceId: string): InvoiceVersionRecord[] {
+    const res: InvoiceVersionRecord[] = [];
+    for (const v of this.versions.values()) {
+      if (v.invoiceId === invoiceId) {
+        res.push({ ...v });
+      }
+    }
+    return res.sort((a, b) => b.revision - a.revision);
+  }
+
+  getAll(): InvoiceVersionRecord[] {
+    return Array.from(this.versions.values());
+  }
+}
+
 export const estimateRepository = new EstimateRepository();
 export const invoiceRepository = new InvoiceRepository();
+export const invoiceLinksRepository = new InvoiceLinksRepository();
+export const invoiceVersionsRepository = new InvoiceVersionsRepository();

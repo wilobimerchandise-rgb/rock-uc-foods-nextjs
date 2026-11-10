@@ -58,15 +58,15 @@ export interface ReconciliationBatchSummary {
 export function extractOrderReference(narration: string): string | null {
   if (!narration) return null;
 
-  // 1. Look for explicit ROC- or EVT- patterns
-  const orderRefRegex = /\b(ROC-[A-Z0-9-]+|EVT-[A-Z0-9-]+)\b/i;
+  // 1. Look for explicit RUC-, ROC- or EVT- patterns
+  const orderRefRegex = /\b(RUC-[A-Z0-9-]+|ROC-[A-Z0-9-]+|EVT-[A-Z0-9-]+)\b/i;
   const match = narration.match(orderRefRegex);
   if (match) {
     return match[1].toUpperCase();
   }
 
-  // 2. Look for order code without hyphen e.g. ROC20261028
-  const noHyphenRegex = /\b(ROC\d{8}[A-Z0-9]+)\b/i;
+  // 2. Look for order code without hyphen e.g. RUC20261028, ROC20261028
+  const noHyphenRegex = /\b(RUC\d{8}[A-Z0-9]+|ROC\d{8}[A-Z0-9]+)\b/i;
   const matchNoHyphen = narration.match(noHyphenRegex);
   if (matchNoHyphen) {
     return matchNoHyphen[1].toUpperCase();

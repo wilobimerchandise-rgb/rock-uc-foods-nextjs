@@ -13,6 +13,22 @@ import { orderRepository } from '@/src/order/orderRepository';
 import { normalizeNigerianPhone } from '@/src/notifications/phone';
 import { sendOrderNotification } from '@/src/notifications/notificationEngine';
 
+function serializeOrder(order: any) {
+  if (!order) return null;
+  return {
+    ...order,
+    deliveryFeeKobo: order.deliveryFeeKobo?.toString(),
+    subtotalKobo: order.subtotalKobo?.toString(),
+    totalKobo: order.totalKobo?.toString(),
+    discountKobo: order.discountKobo ? order.discountKobo.toString() : undefined,
+    items: (order.items || []).map((i: any) => ({
+      ...i,
+      unitPriceKoboSnapshot: i.unitPriceKoboSnapshot?.toString(),
+      totalKoboSnapshot: i.totalKoboSnapshot?.toString(),
+    })),
+  };
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const orderId = searchParams.get('orderId');
@@ -89,7 +105,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         assignment,
-        order,
+        order: serializeOrder(order),
       });
     }
 

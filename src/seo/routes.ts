@@ -14,6 +14,8 @@ export interface PublicRoute {
 
 export const PUBLIC_ROUTES: PublicRoute[] = [
   { path: '/', priority: 1.0, changeFrequency: 'daily' },
+  { path: '/menu', priority: 0.9, changeFrequency: 'daily' },
+  { path: '/catering', priority: 0.8, changeFrequency: 'weekly' },
   { path: '/estimate', priority: 0.8, changeFrequency: 'weekly' },
   { path: '/privacy', priority: 0.3, changeFrequency: 'monthly' },
   { path: '/terms', priority: 0.3, changeFrequency: 'monthly' },

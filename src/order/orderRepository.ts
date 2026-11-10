@@ -64,6 +64,7 @@ class OrderRepository {
       paymentVerifiedAt: new Date(Date.now() - 1800000).toISOString(),
       paymentVerifiedBy: 'usr-owner-01',
       paymentReference: 'WEMA-TRF-982341829',
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       createdAt: new Date(Date.now() - 3600000).toISOString(),
       updatedAt: new Date(Date.now() - 1800000).toISOString(),
       items: [
@@ -174,4 +175,7 @@ class OrderRepository {
   }
 }
 
-export const orderRepository = new OrderRepository();
+const globalRepo = ((globalThis as any).__rockUcOrderRepo as OrderRepository) || new OrderRepository();
+(globalThis as any).__rockUcOrderRepo = globalRepo;
+
+export const orderRepository: OrderRepository = globalRepo;

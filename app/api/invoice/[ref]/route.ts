@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { invoiceRepository, estimateRepository } from '@/src/invoices/repository';
+import { invoiceRepository, estimateRepository, invoiceLinksRepository } from '@/src/invoices/repository';
 import { verifyTokenHash } from '@/src/invoices/publicRef';
 import { renderInvoicePdfBuffer, InvoicePdfData } from '@/src/lib/pdf/InvoiceDocument';
 
@@ -48,11 +48,27 @@ export async function GET(
     return notFoundResponse();
   }
 
-  // 3. Constant-time token verification (wrong token gives the EXACT same 404)
-  const isMatch = verifyTokenHash(token, invoice.accessTokenHash);
-  if (!isMatch) {
+  // 3. Constant-time token verification (accept original token OR any valid non-expired, non-revoked link)
+  let isAuthorized = verifyTokenHash(token, invoice.accessTokenHash);
+
+  if (!isAuthorized) {
+    const links = invoiceLinksRepository.getLinksByInvoiceId(invoice.id);
+    const now = Date.now();
+    for (const link of links) {
+      if (link.revokedAt) continue;
+      if (new Date(link.expiresAt).getTime() < now) continue;
+
+      if (verifyTokenHash(token, link.tokenHash)) {
+        isAuthorized = true;
+        break;
+      }
+    }
+  }
+
+  if (!isAuthorized) {
     return notFoundResponse();
   }
+
 
   // Common security headers
   const securityHeaders = {

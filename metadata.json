@@ -1,6 +1,8 @@
 {
   "name": "ROCK UC FOODS",
-  "description": "Premium Nigerian food-ordering and catering platform with server-authoritative kobo pricing, audit logging, and operations dashboard.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "Authentic Nigerian culinary & event catering platform with real-time KDS, dispatch tracking, bank reconciliation, and Paystack integration.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "permissions": []
 }

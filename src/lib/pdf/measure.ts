@@ -6,8 +6,9 @@
  * text widths conservatively so numbers never overflow table cells or margins.
  */
 
-// @ts-expect-error fontkit untyped module
-import * as fontkit from 'fontkit';
+// @ts-expect-error fontkit CJS module
+import * as fontkitModule from 'fontkit';
+const fontkit = (fontkitModule as any).default || fontkitModule;
 import * as path from 'path';
 import { NAIRA_SYMBOL } from '../money';
 

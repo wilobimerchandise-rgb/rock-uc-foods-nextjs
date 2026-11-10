@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ROCK UC FOODS - Staff / Owner Catering & Invoicing Manager
  * (Playbook v2 Section 9, 10 & Section 17 v3 Addendum)

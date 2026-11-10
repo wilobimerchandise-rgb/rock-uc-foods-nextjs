@@ -34,6 +34,7 @@ export interface InvoicePdfItem {
 
 export interface InvoicePdfData {
   invoiceNumber: string;
+  revision?: number;
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
@@ -237,7 +238,9 @@ export const InvoiceDocument: React.FC<{ data: InvoicePdfData }> = ({ data }) =>
             <Text style={styles.headerSubtitle}>{BUSINESS_CONTACT.tagline}</Text>
           </View>
           <View style={styles.invoiceMeta}>
-            <Text style={styles.invoiceNumberText}>{data.invoiceNumber}</Text>
+            <Text style={styles.invoiceNumberText}>
+              {data.invoiceNumber}{data.revision && data.revision > 1 ? ` (Rev ${data.revision})` : ''}
+            </Text>
             <Text style={{ color: '#FFFFFF', fontSize: 8, marginTop: 2 }}>
               {BUSINESS_CONTACT.location} | Tel: {BUSINESS_CONTACT.phone}
             </Text>

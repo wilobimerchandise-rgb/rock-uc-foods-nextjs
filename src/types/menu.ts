@@ -24,6 +24,15 @@ export interface MenuOptionGroup {
   options: MenuOption[];
 }
 
+export interface SizeTier {
+  id: string;
+  itemId: string;
+  label: string; // e.g. S, M, L, Single pack, Family pack, bottle
+  priceKobo: bigint;
+  active: boolean;
+  sortOrder: number;
+}
+
 export interface MenuItem {
   id: string;
   sku: string;
@@ -44,7 +53,11 @@ export interface MenuItem {
   version: number;
   updatedBy?: string;
   updatedAt: string;
+  showHeat?: boolean;
+  availabilityNote?: string;
+  photoUrl?: string;
   optionGroups?: MenuOptionGroup[];
+  sizeTiers?: SizeTier[];
 }
 
 export interface MenuCategory {
@@ -68,6 +81,8 @@ export interface OrderablePriceResult {
   itemId: string;
   itemName: string;
   basePriceKobo: bigint;
+  tierId?: string;
+  tierName?: string;
   optionsTotalKobo: bigint;
   totalUnitKobo: bigint;
   optionSnapshots: Array<{

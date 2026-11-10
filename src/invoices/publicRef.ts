@@ -52,3 +52,22 @@ export function verifyTokenHash(rawToken: string, storedHash: string): boolean {
 
 export const hashAccessToken = hashToken;
 export const verifyAccessToken = verifyTokenHash;
+
+export function isInvoiceAuthorizedByLinks(
+  token: string,
+  invoiceAccessTokenHash: string,
+  links: Array<{ tokenHash: string; expiresAt: string; revokedAt?: string }>,
+  nowMs = Date.now()
+): boolean {
+  if (verifyTokenHash(token, invoiceAccessTokenHash)) {
+    return true;
+  }
+  for (const link of links) {
+    if (link.revokedAt) continue;
+    if (new Date(link.expiresAt).getTime() < nowMs) continue;
+    if (verifyTokenHash(token, link.tokenHash)) {
+      return true;
+    }
+  }
+  return false;
+}

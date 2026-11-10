@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ROCK UC FOODS - Staff / Owner Live Order Manager
  * (Playbook v2 Section 8, 10 & Section 17 v3 Addendum)
@@ -149,7 +151,7 @@ export const StaffOrderManager: React.FC<StaffOrderManagerProps> = ({
   });
 
   return (
-    <div className="bg-[#0B0A09] text-[#F7EFD9] min-h-screen p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+    <div className="bg-[#0B0A09] text-[#F7EFD9] min-h-screen p-4 md:p-6 max-w-5xl mx-auto space-y-6 min-w-0 w-full max-w-full">
       {/* Top Banner */}
       {notification && (
         <div
@@ -191,8 +193,8 @@ export const StaffOrderManager: React.FC<StaffOrderManagerProps> = ({
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 min-w-0 w-full">
+        <div className="relative flex-1 min-w-0">
           <Search className="w-4 h-4 text-white/40 absolute left-3 top-2.5" />
           <input
             type="text"
@@ -203,22 +205,43 @@ export const StaffOrderManager: React.FC<StaffOrderManagerProps> = ({
           />
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs">
-          {['all', 'pending_payment', 'payment_confirmed', 'in_kitchen', 'out_for_delivery', 'delivered', 'cancelled'].map(
-            (status) => (
-              <button
-                key={status}
-                onClick={() => setFilterStatus(status)}
-                className={`px-3 py-1.5 rounded-lg font-semibold shrink-0 transition-all ${
-                  filterStatus === status
-                    ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/50'
-                    : 'bg-[#17120F] text-white/60 hover:text-white border border-white/5'
-                }`}
-              >
-                {status.replace(/_/g, ' ')}
-              </button>
-            )
-          )}
+        {/* Filter Chip Row Scroll Container with Right Fade (Section 27.1) */}
+        <div
+          className="relative w-full sm:w-auto min-w-0 max-w-full flex-1"
+          data-testid="filter-chip-wrapper"
+        >
+          <div
+            className="w-full max-w-full overflow-x-auto [overscroll-behavior-x:contain] no-scrollbar min-w-0 pb-1"
+            data-testid="filter-chip-scroll"
+          >
+            <div
+              className="flex items-center gap-1.5 w-[max-content] min-w-max flex-nowrap text-xs pr-4"
+              data-testid="filter-chip-row"
+            >
+              {['all', 'pending_payment', 'payment_confirmed', 'in_kitchen', 'out_for_delivery', 'delivered', 'cancelled'].map(
+                (status) => (
+                  <button
+                    key={status}
+                    data-testid={`filter-chip-${status}`}
+                    onClick={() => setFilterStatus(status)}
+                    className={`px-3 py-1.5 rounded-lg font-semibold shrink-0 transition-all ${
+                      filterStatus === status
+                        ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/50'
+                        : 'bg-[#17120F] text-white/60 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    {status.replace(/_/g, ' ')}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+          {/* Soft fade hint on the right edge */}
+          <div
+            className="pointer-events-none absolute right-0 top-0 bottom-1 w-6 bg-gradient-to-l from-[#0B0A09] to-transparent"
+            aria-hidden="true"
+            data-testid="filter-chip-fade"
+          />
         </div>
       </div>
 

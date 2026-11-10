@@ -1,6 +1,7 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,
@@ -20,6 +21,7 @@ const nextConfig: NextConfig = {
     ],
   },
   output: 'standalone',
+  serverExternalPackages: ['fontkit', '@electric-sql/pglite', 'pdf-parse'],
   transpilePackages: ['motion'],
   headers: async () => [
     {

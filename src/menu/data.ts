@@ -12,10 +12,11 @@ export const initialCategories: MenuCategory[] = [
   { id: 'cat-rice', name: 'Test Rice', sortOrder: 10, isVisible: true, version: 1 },
   { id: 'cat-soups', name: 'Test Soups', sortOrder: 20, isVisible: true, version: 1 },
   { id: 'cat-sides', name: 'Test Sides', sortOrder: 30, isVisible: true, version: 1 },
+  { id: 'cat-drinks', name: 'Artisan Drinks', sortOrder: 35, isVisible: true, version: 1 },
   { id: 'cat-empty', name: 'Special Dishes (Unreleased)', sortOrder: 40, isVisible: true, version: 1 },
 ];
 
-// Initial Golden Fixture Items (T-001, T-002, T-003, T-001-X)
+// Initial Golden Fixture Items (T-001, T-002, T-003, T-004)
 export const initialMenuItems: MenuItem[] = [
   {
     id: 'item-t001',
@@ -32,22 +33,40 @@ export const initialMenuItems: MenuItem[] = [
     isFreeItem: false,
     sortOrder: 10,
     version: 1,
+    showHeat: true,
+    availabilityNote: 'Cooked fresh daily',
     updatedAt: new Date().toISOString(),
     optionGroups: [
       {
         id: 'grp-t001-opt',
         itemId: 'item-t001',
-        name: 'Protein',
+        name: 'Choose one protein',
         minSelect: 0,
         maxSelect: 1,
         options: [
+          {
+            id: 'opt-t001-meat',
+            groupId: 'grp-t001-opt',
+            name: 'Assorted Meat',
+            priceDeltaKobo: 0n, // included
+            isAvailable: true,
+            sortOrder: 1,
+          },
           {
             id: 'opt-t001-x',
             groupId: 'grp-t001-opt',
             name: 'Extra protein on T-001',
             priceDeltaKobo: 100000n, // +₦1,000.00
             isAvailable: true,
-            sortOrder: 1,
+            sortOrder: 2,
+          },
+          {
+            id: 'opt-t001-fish',
+            groupId: 'grp-t001-opt',
+            name: 'Fresh Grilled Fish',
+            priceDeltaKobo: 250000n, // +₦2,500.00
+            isAvailable: true,
+            sortOrder: 3,
           },
         ],
       },
@@ -68,6 +87,8 @@ export const initialMenuItems: MenuItem[] = [
     isFreeItem: false,
     sortOrder: 20,
     version: 1,
+    showHeat: true,
+    availabilityNote: 'Available Wednesday and Friday only',
     updatedAt: new Date().toISOString(),
     optionGroups: [],
   },
@@ -86,8 +107,54 @@ export const initialMenuItems: MenuItem[] = [
     isFreeItem: false,
     sortOrder: 30,
     version: 1,
+    showHeat: false,
     updatedAt: new Date().toISOString(),
     optionGroups: [],
+  },
+  {
+    id: 'item-t004',
+    sku: 'T-004',
+    categoryId: 'cat-drinks',
+    name: 'Zobo Blossom & Ginger Infusion',
+    description: 'Slow-steeped organic hibiscus flower with fresh ginger and clove aromatics.',
+    priceKobo: 0n, // Drinks have size tiers instead of base price
+    portionLabel: 'Chilled bottle',
+    allergens: [],
+    status: 'published',
+    isAvailable: true,
+    isFeatured: false,
+    isFreeItem: false,
+    sortOrder: 40,
+    version: 1,
+    showHeat: false, // Drinks stay cool, with no steam!
+    availabilityNote: 'Chilled fresh daily',
+    updatedAt: new Date().toISOString(),
+    sizeTiers: [
+      {
+        id: 'tier-t004-s',
+        itemId: 'item-t004',
+        label: 'S',
+        priceKobo: 150000n, // ₦1,500.00
+        active: true,
+        sortOrder: 1,
+      },
+      {
+        id: 'tier-t004-m',
+        itemId: 'item-t004',
+        label: 'M',
+        priceKobo: 250000n, // ₦2,500.00
+        active: true,
+        sortOrder: 2,
+      },
+      {
+        id: 'tier-t004-l',
+        itemId: 'item-t004',
+        label: 'L',
+        priceKobo: 400000n, // ₦4,000.00
+        active: true,
+        sortOrder: 3,
+      },
+    ],
   },
 ];
 
@@ -99,6 +166,7 @@ function cloneMenuItems(items: MenuItem[]): MenuItem[] {
       ...g,
       options: g.options.map((o) => ({ ...o })),
     })),
+    sizeTiers: item.sizeTiers?.map((t) => ({ ...t })),
   }));
 }
 
@@ -246,11 +314,18 @@ class MenuRepository {
       throw new Error(`Duplicate dish name: "${trimmedName}" already exists in category "${category.name}".`);
     }
 
-    // Price safety check: published item cannot have price 0 unless isFreeItem === true
+    // Phase 2B Rule: An item has either a base price or size tiers, never both
+    const incomingTiers = itemInput.sizeTiers || [];
+    if (incomingTiers.length > 0 && itemInput.priceKobo > 0n) {
+      throw new Error('Item cannot have both a base price and size tiers.');
+    }
+
+    // Price safety check: published item cannot have price 0 unless has sizeTiers or isFreeItem === true
     const status = itemInput.status || 'draft';
     const isFree = itemInput.isFreeItem ?? false;
-    if (status === 'published' && itemInput.priceKobo === 0n && !isFree) {
-      throw new Error('Price safety violation: Published items cannot have price ₦0.00 unless explicitly flagged as a free item.');
+    const hasTiers = incomingTiers.length > 0;
+    if (status === 'published' && itemInput.priceKobo === 0n && !isFree && !hasTiers) {
+      throw new Error('Price safety violation: Published items cannot have price ₦0.00 unless explicitly flagged as a free item or size-tiered.');
     }
 
     if (itemInput.priceKobo < 0n) {
@@ -279,7 +354,11 @@ class MenuRepository {
         version: 1,
         updatedBy: actorId,
         updatedAt: new Date().toISOString(),
+        showHeat: itemInput.showHeat ?? false,
+        availabilityNote: itemInput.availabilityNote,
+        photoUrl: itemInput.photoUrl,
         optionGroups: itemInput.optionGroups || [],
+        sizeTiers: itemInput.sizeTiers || [],
       };
       this.items.push(savedItem);
     } else {
@@ -318,6 +397,10 @@ class MenuRepository {
           version: existing.version,
           updatedBy: existing.updatedBy,
           updatedAt: existing.updatedAt,
+          showHeat: existing.showHeat,
+          availabilityNote: existing.availabilityNote,
+          photoUrl: existing.photoUrl,
+          sizeTiers: existing.sizeTiers ? [...existing.sizeTiers] : [],
         },
         changedBy: actorId,
         changedAt: new Date().toISOString(),
@@ -334,6 +417,10 @@ class MenuRepository {
       existing.status = status;
       existing.isFeatured = itemInput.isFeatured ?? existing.isFeatured;
       existing.isFreeItem = isFree;
+      if (itemInput.showHeat !== undefined) existing.showHeat = itemInput.showHeat;
+      if (itemInput.availabilityNote !== undefined) existing.availabilityNote = itemInput.availabilityNote;
+      if (itemInput.photoUrl !== undefined) existing.photoUrl = itemInput.photoUrl;
+      if (itemInput.sizeTiers !== undefined) existing.sizeTiers = itemInput.sizeTiers;
       if (itemInput.optionGroups) existing.optionGroups = itemInput.optionGroups;
       existing.version += 1;
       existing.updatedBy = actorId;
@@ -438,6 +525,13 @@ class MenuRepository {
     categoryItems[swapIdx].sortOrder = currentOrder;
 
     return this.items;
+  }
+
+  public resetForTesting(): void {
+    this.categories = [...initialCategories];
+    this.items = cloneMenuItems(initialMenuItems);
+    this.versions = [];
+    this.versionIdCounter = 1;
   }
 }
 

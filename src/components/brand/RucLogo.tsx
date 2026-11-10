@@ -112,11 +112,11 @@ export const RucLogo: React.FC<RucLogoProps> = ({
 
       {/* Wordmark Lockup: Live text 'ROCK UC FOODS' and tagline (Playbook Section 4B) */}
       {showWordmark && (
-        <div className="flex flex-col">
-          <span className="font-serif font-black tracking-wider text-base md:text-lg text-[#F7EFD9] leading-tight uppercase">
+        <div className="flex flex-col justify-center">
+          <span className="font-serif font-black tracking-wider text-base md:text-lg text-[#F7EFD9] leading-tight uppercase whitespace-nowrap">
             ROCK UC FOODS
           </span>
-          <span className="text-[10px] md:text-xs text-[#D4AF37] tracking-widest uppercase font-semibold">
+          <span className="text-[10px] md:text-xs text-[#D4AF37] tracking-widest uppercase font-semibold hidden sm:block whitespace-nowrap">
             Taste the Luxury
           </span>
         </div>
