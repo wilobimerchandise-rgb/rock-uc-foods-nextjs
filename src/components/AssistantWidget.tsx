@@ -170,6 +170,17 @@ export function AssistantWidget() {
                     {/* Rendered strictly as React text (zero raw HTML) */}
                     <p className="whitespace-pre-wrap">{m.reply.text}</p>
 
+                    {isAssistant && m.reply.linkUrl && m.reply.linkUrl.startsWith('/') && !m.reply.linkUrl.startsWith('//') && (
+                      <div className="mt-3">
+                        <a
+                          href={m.reply.linkUrl}
+                          className="inline-flex items-center rounded bg-[#D4AF37] px-3 py-1.5 text-xs font-semibold text-[#17120F] hover:opacity-90"
+                        >
+                          {m.reply.linkLabel || 'Open link'}
+                        </a>
+                      </div>
+                    )}
+
                     {/* WhatsApp handoff button for non-plain answers */}
                     {showWhatsapp && (
                       <div className="mt-3 pt-2 border-t border-[#D4AF37]/20">
@@ -228,4 +239,4 @@ export function AssistantWidget() {
       )}
     </div>
   );
-}
+                          }
