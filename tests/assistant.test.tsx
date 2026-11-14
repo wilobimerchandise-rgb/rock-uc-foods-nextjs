@@ -278,4 +278,49 @@ describe('Playbook Section 19.2: Customer AI Assistant Tests', () => {
       expect(lagosDay).toBe('2026-10-24');
     });
   });
+
+  describe('Event quote reply carries estimator link', () => {
+    const enquiry = 'Hello ROCK UC FOODS, I would like to enquire about bulk event catering for an upcoming celebration.';
+
+    it('returns the quote reply with estimator link and prefilled WhatsApp URL', () => {
+      const r = guardMessage(enquiry);
+      expect(r?.kind).toBe('handoff');
+      expect(r?.reason).toBe('event_quote');
+      expect(r?.linkUrl).toBe('/estimate');
+      expect(r?.linkLabel).toBeTruthy();
+      expect(r?.whatsappUrl?.startsWith(BUSINESS_CONTACT.whatsappUrl + '?text=')).toBe(true);
+      expect(r?.text).toContain(BUSINESS_CONTACT.phone);
+    });
+
+    it('never states a price or promises a final quote', () => {
+      const r = guardMessage(enquiry);
+      const noPhone = (r?.text ?? '').split(BUSINESS_CONTACT.phone).join('');
+      expect(noPhone).not.toMatch(/₦|naira|\bNGN\b|\d{3,}/i);
+      expect(r?.text).toMatch(/guide only/i);
+    });
+
+    it('does not add the link to other handoffs or to refund/cancel messages', () => {
+      expect(guardMessage('Does this have peanuts?')?.linkUrl).toBeUndefined();
+      const c = guardMessage('I want to cancel my event order');
+      expect(c?.linkUrl).toBeUndefined();
+    });
+
+    it('all six event_quote fixtures include the link', () => {
+      const fx = ASSISTANT_QUESTION_FIXTURES.filter((f: any) => f.expectedReason === 'event_quote' || f.reason === 'event_quote');
+      for (const f of fx as any[]) {
+        expect(guardMessage(f.question ?? f.message ?? f.input)?.linkUrl).toBe('/estimate');
+      }
+    });
+
+    it('handler returns the guarded reply without calling the model', async () => {
+      let called = false;
+      const res = await handleAssistantRequest({ message: enquiry }, 'iphash', {
+        llmClient: async () => { called = true; return 'x'; },
+        loadMenu: async () => [],
+        checkRateLimit: async () => ({ allowed: true }),
+      } as any);
+      expect(called).toBe(false);
+      expect((res.body as AssistantReply).linkUrl).toBe('/estimate');
+    });
+  });
 });
