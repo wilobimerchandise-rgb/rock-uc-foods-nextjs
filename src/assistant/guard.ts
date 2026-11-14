@@ -213,7 +213,7 @@ export function guardMessage(raw: string): AssistantReply | null {
 
   if (!isExcludedFromEventHandoff) {
     const bulkEventKeywords =
-      /\b(wedding|burial|funeral|conference|corporate|catering|live cooking|tasting|quote)\b/i;
+      /\b(wedding|burial|funeral|conference|corporate|catering|live cooking|tasting|quote|bulk|event|celebration|party)\b/i;
     const guestCountMatch = norm.match(/\b(\d+)\s*(guests?|people|packs?|plates?|portions?)\b/i);
 
     let isOver20Guests = false;
@@ -227,12 +227,20 @@ export function guardMessage(raw: string): AssistantReply | null {
     if (isOver20Guests || bulkEventKeywords.test(norm)) {
       return {
         kind: 'handoff',
-        text: `For catering events and orders of 21+ packs, please submit our Event Planning Inquiry or chat with Chef Esther directly on WhatsApp at ${BUSINESS_CONTACT.phone} for bespoke menus and quotes.`,
-        whatsappUrl: BUSINESS_CONTACT.whatsappUrl,
+        text:
+          'Thank you for your interest in ROCK UC FOODS catering! For bulk and event orders, Chef Esther prepares a bespoke quote based on your menu, guest count, date and location.\n\n' +
+          'You can get a quick planning estimate with our online estimator (link below), then send it to Chef Esther on WhatsApp to confirm. The estimator is a guide only, not a final price: Chef Esther confirms the official quote.\n\n' +
+          `You can also reach her directly on ${BUSINESS_CONTACT.phone}.`,
+        whatsappUrl:
+          BUSINESS_CONTACT.whatsappUrl +
+          '?text=' +
+          encodeURIComponent('Hello ROCK UC FOODS, I would like to enquire about bulk event catering for an upcoming celebration.'),
+        linkUrl: '/estimate',
+        linkLabel: 'Open the event estimator',
         reason: 'event_quote',
       };
     }
   }
 
   return null;
-}
+    }
