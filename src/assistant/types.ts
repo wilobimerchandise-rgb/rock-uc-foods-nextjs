@@ -15,6 +15,9 @@ export interface AssistantReply {
   kind: ReplyKind;
   text: string;
   whatsappUrl?: string;
+  /** Optional internal link button (path starting with '/'), e.g. the estimator. */
+  linkUrl?: string;
+  linkLabel?: string;
   reason?: string;
 }
 
@@ -33,4 +36,4 @@ export interface AssistantDeps {
   checkRateLimit: (key: string, limit: number, windowSeconds: number) => Promise<{ allowed: boolean; retryAfter?: number }>;
   recordAudit?: (entry: { action: string; kind: ReplyKind; reason?: string; ipHash: string }) => Promise<void>;
   now?: () => Date;
-}
+  }
