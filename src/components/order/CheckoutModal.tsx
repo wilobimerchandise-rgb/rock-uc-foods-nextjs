@@ -420,11 +420,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-[#17120F] p-2.5 rounded border border-white/5">
               <div>
                 <span className="text-white/50 block">Bank Name:</span>
-                <span className="font-bold text-[#F7EFD9]">Wema Bank</span>
+                <span className="font-bold text-[#F7EFD9]">GTBank</span>
               </div>
               <div>
                 <span className="text-white/50 block">Account Number:</span>
-                <span className="font-mono font-bold text-[#D4AF37] text-xs">0258778644</span>
+                <span className="font-mono font-bold text-[#D4AF37] text-xs">0013190627</span>
               </div>
               <div>
                 <span className="text-white/50 block">Account Name:</span>
