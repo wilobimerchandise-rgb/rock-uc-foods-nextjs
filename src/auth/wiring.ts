@@ -9,9 +9,12 @@
  * - Generates TOTP secrets and verified factors using RFC 6238 totp engine.
  */
 
+import crypto from 'crypto';
 import { AuthPort, AuthPortUser, AuthPortSession, LoginCoreDeps } from './login-core';
 import { UserProfile } from '../lib/auth/access';
 import { generateMfaSecret, verifyTotp } from '../security/totp';
+import { securityStore } from '../security/stepUp';
+import { SESSION_COOKIE_NAME } from './cookies';
 
 export interface InternalUserRecord {
   id: string;
@@ -94,6 +97,7 @@ export const INITIAL_ACCOUNTS: InternalUserRecord[] = [
 export class InMemoryAuthService implements AuthPort {
   private users: Map<string, InternalUserRecord> = new Map();
   private currentSession: AuthPortSession | null = null;
+  private sessionsByToken: Map<string, AuthPortSession> = new Map();
 
   constructor(initialUsers: InternalUserRecord[] = INITIAL_ACCOUNTS) {
     this.reset(initialUsers);
@@ -108,6 +112,7 @@ export class InMemoryAuthService implements AuthPort {
       });
     }
     this.currentSession = null;
+    this.sessionsByToken.clear();
   }
 
   public findUserByEmail(email: string): InternalUserRecord | undefined {
@@ -124,6 +129,41 @@ export class InMemoryAuthService implements AuthPort {
     return this.users.get(id);
   }
 
+  public getSessionByToken(token: string | null | undefined): AuthPortSession | null {
+    if (!token) return null;
+    const session = this.sessionsByToken.get(token);
+    if (!session) return null;
+    if (session.expires_at && Date.now() > session.expires_at) {
+      this.sessionsByToken.delete(token);
+      return null;
+    }
+    const user = this.users.get(session.user.id);
+    if (!user || !user.isActive) {
+      this.sessionsByToken.delete(token);
+      return null;
+    }
+    session.user = this.toAuthUser(user);
+    return session;
+  }
+
+  private createSessionForRecord(
+    record: InternalUserRecord,
+    authChannel: 'cookie' | 'in_memory'
+  ): { user: AuthPortUser; session: AuthPortSession } {
+    const authUser = this.toAuthUser(record);
+    const token = `tok-${crypto.randomBytes(24).toString('hex')}`;
+    const session: AuthPortSession = {
+      access_token: token,
+      refresh_token: `ref-${crypto.randomBytes(16).toString('hex')}`,
+      expires_at: Date.now() + 1000 * 60 * 60 * 24,
+      user: authUser,
+      aal: 'aal1',
+      authChannel,
+    };
+    this.sessionsByToken.set(token, session);
+    return { user: authUser, session };
+  }
+
   public async signInWithPassword(credentials: { email: string; password: string }): Promise<{
     user: AuthPortUser;
     session: AuthPortSession;
@@ -133,20 +173,15 @@ export class InMemoryAuthService implements AuthPort {
       throw new Error('Invalid credentials');
     }
 
-    const authUser = this.toAuthUser(record);
-    const session: AuthPortSession = {
-      access_token: `tok-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      refresh_token: `ref-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      expires_at: Date.now() + 1000 * 60 * 60 * 24,
-      user: authUser,
-      aal: record.factors.some((f) => f.status === 'verified') ? 'aal1' : 'aal1',
-    };
-
-    this.currentSession = session;
-    return { user: authUser, session };
+    const res = this.createSessionForRecord(record, 'in_memory');
+    this.currentSession = res.session;
+    return res;
   }
 
   public async signOut(): Promise<void> {
+    if (this.currentSession) {
+      this.sessionsByToken.delete(this.currentSession.access_token);
+    }
     this.currentSession = null;
   }
 
@@ -160,22 +195,24 @@ export class InMemoryAuthService implements AuthPort {
 
   public setSession(session: AuthPortSession | null): void {
     this.currentSession = session;
+    if (session?.access_token) {
+      this.sessionsByToken.set(session.access_token, session);
+    }
   }
 
-  public async mfaEnroll(params: { factorType: 'totp'; issuer?: string }): Promise<{
+  private enrollFactorForSession(
+    session: AuthPortSession | null,
+    params: { factorType: 'totp'; issuer?: string }
+  ): {
     id: string;
     type: 'totp';
-    totp: {
-      qr_code: string;
-      secret: string;
-      uri: string;
-    };
-  }> {
-    if (!this.currentSession) {
+    totp: { qr_code: string; secret: string; uri: string };
+  } {
+    if (!session) {
       throw new Error('No active session for MFA enrollment');
     }
 
-    const userId = this.currentSession.user.id;
+    const userId = session.user.id;
     const user = this.users.get(userId);
     if (!user) {
       throw new Error('User not found');
@@ -191,8 +228,7 @@ export class InMemoryAuthService implements AuthPort {
       secret: cred.secret,
     });
 
-    // Update current session user factors
-    this.currentSession.user = this.toAuthUser(user);
+    session.user = this.toAuthUser(user);
 
     return {
       id: factorId,
@@ -205,15 +241,15 @@ export class InMemoryAuthService implements AuthPort {
     };
   }
 
-  public async mfaChallengeAndVerify(params: { factorId: string; code: string }): Promise<{
-    user: AuthPortUser;
-    session: AuthPortSession;
-  }> {
-    if (!this.currentSession) {
+  private verifyFactorForSession(
+    session: AuthPortSession | null,
+    params: { factorId: string; code: string }
+  ): { user: AuthPortUser; session: AuthPortSession } {
+    if (!session) {
       throw new Error('No active session');
     }
 
-    const userId = this.currentSession.user.id;
+    const userId = session.user.id;
     const user = this.users.get(userId);
     if (!user) {
       throw new Error('User not found');
@@ -224,32 +260,137 @@ export class InMemoryAuthService implements AuthPort {
       throw new Error('Factor not found');
     }
 
-    // Verify TOTP code using security totp engine
     const res = verifyTotp(params.code, factor.secret);
     if (!res.valid) {
       throw new Error('Invalid verification code');
     }
 
-    // Mark verified
     factor.status = 'verified';
+    securityStore.syncVerifiedTotpCredential(user.id, factor.secret);
 
     const authUser = this.toAuthUser(user);
-    this.currentSession.user = authUser;
-    this.currentSession.aal = 'aal2';
+    session.user = authUser;
+    session.aal = 'aal2';
 
     return {
       user: authUser,
-      session: this.currentSession,
+      session,
     };
   }
 
-  public async mfaUnenroll(params: { factorId: string }): Promise<void> {
-    if (!this.currentSession) return;
-    const user = this.users.get(this.currentSession.user.id);
+  private unenrollFactorForSession(
+    session: AuthPortSession | null,
+    params: { factorId: string }
+  ): void {
+    if (!session) return;
+    const user = this.users.get(session.user.id);
     if (!user) return;
 
     user.factors = user.factors.filter((f) => f.id !== params.factorId);
-    this.currentSession.user = this.toAuthUser(user);
+    session.user = this.toAuthUser(user);
+  }
+
+  public async mfaEnroll(params: { factorType: 'totp'; issuer?: string }): Promise<{
+    id: string;
+    type: 'totp';
+    totp: {
+      qr_code: string;
+      secret: string;
+      uri: string;
+    };
+  }> {
+    return this.enrollFactorForSession(this.currentSession, params);
+  }
+
+  public async mfaChallengeAndVerify(params: { factorId: string; code: string }): Promise<{
+    user: AuthPortUser;
+    session: AuthPortSession;
+  }> {
+    return this.verifyFactorForSession(this.currentSession, params);
+  }
+
+  public async mfaUnenroll(params: { factorId: string }): Promise<void> {
+    this.unenrollFactorForSession(this.currentSession, params);
+  }
+
+  /**
+   * Creates an AuthPort strictly isolated to an HTTP cookie token so concurrent or anonymous
+   * browser requests can never inherit another visitor's session.
+   */
+  public createCookieScopedAuthPort(initialToken: string | null): AuthPort & {
+    getActiveSessionToken: () => string | null;
+  } {
+    let activeToken: string | null = initialToken;
+    const service = this;
+
+    return {
+      getActiveSessionToken: () => activeToken,
+      async signInWithPassword(credentials) {
+        const record = service.findUserByEmail(credentials.email);
+        if (!record || record.passwordHash !== credentials.password) {
+          throw new Error('Invalid credentials');
+        }
+        const res = service.createSessionForRecord(record, 'cookie');
+        activeToken = res.session.access_token;
+        return res;
+      },
+      async signOut() {
+        if (activeToken) {
+          service.sessionsByToken.delete(activeToken);
+          if (service.currentSession?.access_token === activeToken) {
+            service.currentSession = null;
+          }
+        }
+        activeToken = null;
+      },
+      async getUser() {
+        const sess = service.getSessionByToken(activeToken);
+        return { user: sess ? sess.user : null };
+      },
+      async getSession() {
+        const sess = service.getSessionByToken(activeToken);
+        return { session: sess };
+      },
+      async mfaEnroll(params) {
+        const sess = service.getSessionByToken(activeToken);
+        return service.enrollFactorForSession(sess, params);
+      },
+      async mfaChallengeAndVerify(params) {
+        const sess = service.getSessionByToken(activeToken);
+        return service.verifyFactorForSession(sess, params);
+      },
+      async mfaUnenroll(params) {
+        const sess = service.getSessionByToken(activeToken);
+        service.unenrollFactorForSession(sess, params);
+      },
+    };
+  }
+
+  public verifyUserFactorDirectly(userId: string, secret: string): void {
+    const user = this.users.get(userId);
+    if (!user) return;
+    const existing = user.factors.find((f) => f.factor_type === 'totp' && f.secret === secret);
+    if (existing) {
+      existing.status = 'verified';
+    } else {
+      user.factors = user.factors.filter((f) => f.status === 'verified');
+      user.factors.push({
+        id: `factor-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        factor_type: 'totp',
+        status: 'verified',
+        secret,
+      });
+    }
+    for (const sess of this.sessionsByToken.values()) {
+      if (sess.user.id === userId) {
+        sess.user = this.toAuthUser(user);
+        sess.aal = 'aal2';
+      }
+    }
+    if (this.currentSession?.user.id === userId) {
+      this.currentSession.user = this.toAuthUser(user);
+      this.currentSession.aal = 'aal2';
+    }
   }
 
   public getAllUsers(): InternalUserRecord[] {
@@ -303,8 +444,15 @@ export class InMemoryAuthService implements AuthPort {
     }
     if (updates.isActive !== undefined) {
       user.isActive = updates.isActive;
-      if (!updates.isActive && this.currentSession?.user.id === id) {
-        this.currentSession = null;
+      if (!updates.isActive) {
+        if (this.currentSession?.user.id === id) {
+          this.currentSession = null;
+        }
+        for (const [tok, sess] of this.sessionsByToken.entries()) {
+          if (sess.user.id === id) {
+            this.sessionsByToken.delete(tok);
+          }
+        }
       }
     }
     if (updates.passwordHash !== undefined) {
@@ -327,12 +475,23 @@ export class InMemoryAuthService implements AuthPort {
       this.currentSession.aal = 'aal1';
       this.currentSession.user = this.toAuthUser(user);
     }
+    for (const sess of this.sessionsByToken.values()) {
+      if (sess.user.id === id) {
+        sess.aal = 'aal1';
+        sess.user = this.toAuthUser(user);
+      }
+    }
   }
 
   public deleteUser(id: string): void {
     this.users.delete(id);
     if (this.currentSession?.user.id === id) {
       this.currentSession = null;
+    }
+    for (const [tok, sess] of this.sessionsByToken.entries()) {
+      if (sess.user.id === id) {
+        this.sessionsByToken.delete(tok);
+      }
     }
   }
 
@@ -349,8 +508,25 @@ export class InMemoryAuthService implements AuthPort {
   }
 }
 
-// Global Singleton InMemoryAuthService for application runtime
-export const globalAuthService = new InMemoryAuthService();
+// Global Singleton InMemoryAuthService anchored on globalThis for Next.js multi-bundle safety
+export const globalAuthService: InMemoryAuthService =
+  ((globalThis as any).__rockUcGlobalAuthService as InMemoryAuthService) ||
+  new InMemoryAuthService();
+(globalThis as any).__rockUcGlobalAuthService = globalAuthService;
+
+function extractSessionTokenFromCookieHeader(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(';')) {
+    const eqIdx = part.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = part.slice(0, eqIdx).trim();
+    if (key === SESSION_COOKIE_NAME) {
+      const val = part.slice(eqIdx + 1).trim();
+      return val ? decodeURIComponent(val) : null;
+    }
+  }
+  return null;
+}
 
 export async function getProfileFromService(userId: string): Promise<UserProfile | null> {
   const user = globalAuthService.getUserById(userId);
@@ -370,10 +546,65 @@ export async function getProfileFromService(userId: string): Promise<UserProfile
   };
 }
 
+export function hasSessionVerifiedMfa(
+  session: AuthPortSession | null,
+  profileHasMfa?: boolean
+): boolean {
+  if (!session) return false;
+  if (session.authChannel === 'cookie') {
+    return session.aal === 'aal2';
+  }
+  return (
+    (session.user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ??
+      false) ||
+    session.aal === 'aal2' ||
+    Boolean(profileHasMfa)
+  );
+}
+
+/**
+ * Resolves the active session from HTTP cookies (`sb-ruc-auth-token`) when inside a Next.js
+ * request scope, failing closed when the cookie is absent or invalid, while preserving
+ * direct in-memory session calls in unit tests outside Next.js request scope.
+ */
+export async function resolveSessionFromRequest(
+  request?: Request
+): Promise<{ session: AuthPortSession | null }> {
+  if (request) {
+    const cookieToken = extractSessionTokenFromCookieHeader(request.headers.get('cookie'));
+    if (cookieToken) {
+      return { session: globalAuthService.getSessionByToken(cookieToken) };
+    }
+  }
+
+  try {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value || null;
+    return { session: globalAuthService.getSessionByToken(token) };
+  } catch {
+    // Outside Next.js async request scope (direct Vitest invocation without HTTP cookie)
+    return globalAuthService.getSession();
+  }
+}
+
 export function createLoginDeps(ipHash: string = 'unknown'): LoginCoreDeps {
   return {
     auth: globalAuthService,
     getProfile: getProfileFromService,
     ipHash,
+  };
+}
+
+export function createCookieLoginDeps(
+  ipHash: string = 'unknown',
+  sessionToken: string | null = null
+): LoginCoreDeps & { getSessionToken: () => string | null } {
+  const scopedAuth = globalAuthService.createCookieScopedAuthPort(sessionToken);
+  return {
+    auth: scopedAuth,
+    getProfile: getProfileFromService,
+    ipHash,
+    getSessionToken: () => scopedAuth.getActiveSessionToken(),
   };
 }

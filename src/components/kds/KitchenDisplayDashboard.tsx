@@ -2,7 +2,7 @@
 
 /**
  * ROCK UC FOODS - Interactive Kitchen Display System (KDS) Dashboard
- * Playbook v2 Section 13 / Phase 4 Real-Time KDS
+ * Playbook v2 Section 13 / Phase 4 Real-Time KDS & Section 35
  */
 
 import React, { useState, useEffect } from 'react';
@@ -10,13 +10,10 @@ import {
   Flame,
   ChefHat,
   Clock,
-  CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  Filter,
   Check,
   PackageCheck,
-  ChevronRight,
   Sparkles,
 } from 'lucide-react';
 import { KitchenTicket, KitchenStation } from '../../types/dispatch';
@@ -57,9 +54,10 @@ export function KitchenDisplayDashboard() {
   useEffect(() => {
     let ignore = false;
     const load = () => {
-      const url = selectedStation === 'all'
-        ? '/api/kds'
-        : `/api/kds?station=${encodeURIComponent(selectedStation)}`;
+      const url =
+        selectedStation === 'all'
+          ? '/api/kds'
+          : `/api/kds?station=${encodeURIComponent(selectedStation)}`;
       fetch(url)
         .then((res) => res.json())
         .then((data) => {
@@ -103,90 +101,102 @@ export function KitchenDisplayDashboard() {
     }
   };
 
-  // Group tickets by active cooking stages
   const queuedTickets = tickets.filter((t) => t.status === 'queued');
   const cookingTickets = tickets.filter((t) => t.status === 'cooking');
   const platedTickets = tickets.filter((t) => t.status === 'plated');
   const completedCount = tickets.filter((t) => t.status === 'handed_off').length;
 
   return (
-    <div className="space-y-6 text-[#F7EFD9]">
+    <div className="space-y-6 text-[var(--text-primary)] min-w-0 max-w-full">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center">
-              <ChefHat className="w-4 h-4 text-[#D4AF37]" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle-card)]">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center shrink-0">
+              <ChefHat className="w-5 h-5 text-[#D4AF37]" />
             </div>
-            <h2 className="text-xl md:text-2xl font-black text-[#F7EFD9] tracking-tight">
+            <h2 className="text-xl md:text-2xl font-black text-[var(--text-primary)] tracking-tight">
               Chef Esther&apos;s Kitchen Display System (KDS)
             </h2>
           </div>
-          <p className="text-xs text-[#F7EFD9]/60 mt-1">
+          <p className="text-sm text-[var(--text-body-muted)] mt-1">
             Real-time station pipeline, chronological cooking timers, and thermal packaging hand-off.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={fetchTickets}
           disabled={loading}
-          className="flex items-center space-x-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors shrink-0"
+          className="min-h-[44px] inline-flex items-center justify-center space-x-2 px-4 py-2 bg-[var(--bg-card)] hover:border-[var(--border-gold)] border border-[var(--border-card)] text-[var(--text-primary)] rounded-xl text-sm font-semibold transition-colors shrink-0"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 text-[var(--text-accent)] ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh Screen</span>
         </button>
       </div>
 
       {errorMsg && (
-        <div className="p-3 bg-rose-950/60 border border-rose-500/50 rounded-xl text-xs text-rose-300 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div
+          role="alert"
+          className="p-3.5 bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] rounded-xl text-sm text-[var(--status-danger-text)] flex items-center gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* KPI Pipeline Counters */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-sky-950/40 border border-sky-500/30 rounded-2xl">
-          <span className="text-[11px] text-sky-400 font-semibold uppercase flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" /> Queued for Cooking
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 bg-[var(--status-info-bg)] border border-[var(--status-info-border)] rounded-2xl">
+          <span className="text-sm text-[var(--status-info-text)] font-semibold uppercase flex items-center gap-1.5">
+            <Clock className="w-4 h-4 shrink-0" /> Queued for Cooking
           </span>
-          <div className="text-2xl font-black text-sky-200 mt-1">{queuedTickets.length}</div>
-          <span className="text-[10px] text-sky-400/80">Awaiting fire</span>
+          <div className="text-2xl font-black text-[var(--status-info-text)] price-tabular mt-1">
+            {queuedTickets.length}
+          </div>
+          <span className="text-sm text-[var(--status-info-text)] opacity-90">Awaiting fire</span>
         </div>
 
-        <div className="p-4 bg-amber-950/40 border border-amber-500/30 rounded-2xl">
-          <span className="text-[11px] text-amber-400 font-semibold uppercase flex items-center gap-1.5">
-            <Flame className="w-3.5 h-3.5" /> Pot On The Fire
+        <div className="p-4 bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] rounded-2xl">
+          <span className="text-sm text-[var(--status-warning-text)] font-semibold uppercase flex items-center gap-1.5">
+            <Flame className="w-4 h-4 shrink-0" /> Pot On The Fire
           </span>
-          <div className="text-2xl font-black text-amber-200 mt-1">{cookingTickets.length}</div>
-          <span className="text-[10px] text-amber-400/80">Active simmering</span>
+          <div className="text-2xl font-black text-[var(--status-warning-text)] price-tabular mt-1">
+            {cookingTickets.length}
+          </div>
+          <span className="text-sm text-[var(--status-warning-text)] opacity-90">Active simmering</span>
         </div>
 
-        <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl">
-          <span className="text-[11px] text-emerald-400 font-semibold uppercase flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" /> Freshly Plated
+        <div className="p-4 bg-[var(--status-success-bg)] border border-[var(--status-success-border)] rounded-2xl">
+          <span className="text-sm text-[var(--status-success-text)] font-semibold uppercase flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 shrink-0" /> Freshly Plated
           </span>
-          <div className="text-2xl font-black text-emerald-200 mt-1">{platedTickets.length}</div>
-          <span className="text-[10px] text-emerald-400/80">Ready for packaging</span>
+          <div className="text-2xl font-black text-[var(--status-success-text)] price-tabular mt-1">
+            {platedTickets.length}
+          </div>
+          <span className="text-sm text-[var(--status-success-text)] opacity-90">Ready for packaging</span>
         </div>
 
-        <div className="p-4 bg-[#17120F] border border-white/10 rounded-2xl">
-          <span className="text-[11px] text-stone-400 font-semibold uppercase flex items-center gap-1.5">
-            <PackageCheck className="w-3.5 h-3.5" /> Dispatched Today
+        <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-2xl">
+          <span className="text-sm text-[var(--text-body-muted)] font-semibold uppercase flex items-center gap-1.5">
+            <PackageCheck className="w-4 h-4 shrink-0" /> Dispatched Today
           </span>
-          <div className="text-2xl font-black text-white mt-1">{completedCount}</div>
-          <span className="text-[10px] text-stone-400">Handed off to riders</span>
+          <div className="text-2xl font-black text-[var(--text-primary)] price-tabular mt-1">
+            {completedCount}
+          </div>
+          <span className="text-sm text-[var(--text-body-muted)]">Handed off to riders</span>
         </div>
       </div>
 
       {/* Station Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/5 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto [overscroll-behavior-x:contain] no-scrollbar pb-2 border-b border-[var(--border-subtle-card)] min-w-0 max-w-full">
         <button
+          type="button"
           onClick={() => setSelectedStation('all')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+          className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 border ${
             selectedStation === 'all'
-              ? 'bg-[#6B1230] text-white border border-[#D4AF37]'
-              : 'bg-white/5 text-stone-400 hover:text-white'
+              ? 'bg-[#6B1230] text-[#F7EFD9] border-[#D4AF37]'
+              : 'bg-[var(--bg-card)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)] hover:text-[var(--text-primary)]'
           }`}
         >
           All Stations ({tickets.length})
@@ -195,17 +205,18 @@ export function KitchenDisplayDashboard() {
           const count = tickets.filter((t) => t.assignedStation === stationKey).length;
           return (
             <button
+              type="button"
               key={stationKey}
               onClick={() => setSelectedStation(stationKey)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 flex items-center gap-1.5 border ${
                 selectedStation === stationKey
-                  ? 'bg-[#6B1230] text-white border border-[#D4AF37]'
-                  : 'bg-white/5 text-stone-400 hover:text-white'
+                  ? 'bg-[#6B1230] text-[#F7EFD9] border-[#D4AF37]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <span>{icon}</span>
+              <span aria-hidden="true">{icon}</span>
               <span>{label}</span>
-              <span className="text-[10px] opacity-75">({count})</span>
+              <span className="opacity-80 price-tabular">({count})</span>
             </button>
           );
         })}
@@ -213,20 +224,22 @@ export function KitchenDisplayDashboard() {
 
       {/* Ticket Grid */}
       {loading ? (
-        <div className="py-16 text-center text-xs text-stone-400 flex items-center justify-center space-x-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-[#D4AF37]" />
+        <div className="py-16 text-center text-sm text-[var(--text-body-muted)] flex items-center justify-center space-x-2">
+          <RefreshCw className="w-4 h-4 animate-spin text-[var(--text-accent)]" />
           <span>Synchronizing Kitchen Tickets...</span>
         </div>
       ) : tickets.length === 0 ? (
-        <div className="py-16 text-center bg-[#17120F] border border-white/10 rounded-2xl p-6">
-          <ChefHat className="w-10 h-10 text-stone-600 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-white">All Kitchen Stations Clear</h3>
-          <p className="text-xs text-stone-400 mt-1">
+        <div className="py-16 text-center bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-2xl p-6">
+          <ChefHat className="w-10 h-10 text-[var(--text-body-muted)] mx-auto mb-2" />
+          <h3 className="text-base font-bold text-[var(--text-primary)]">
+            All Kitchen Stations Clear
+          </h3>
+          <p className="text-sm text-[var(--text-body-muted)] mt-1">
             New customer orders with verified payments will automatically populate tickets here.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
           {tickets.map((t) => {
             const isQueued = t.status === 'queued';
             const isCooking = t.status === 'cooking';
@@ -242,41 +255,41 @@ export function KitchenDisplayDashboard() {
             return (
               <div
                 key={t.id}
-                className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                className={`p-5 rounded-2xl border transition-all flex flex-col justify-between min-w-0 ${
                   t.priority === 'urgent'
-                    ? 'bg-rose-950/30 border-rose-500/80 shadow-rose-900/20 shadow-lg'
+                    ? 'bg-[var(--status-danger-bg)] border-[var(--status-danger-border)] shadow-lg'
                     : isHandedOff
-                    ? 'bg-stone-900/40 border-white/5 opacity-60'
-                    : 'bg-[#17120F] border-white/10 hover:border-[#D4AF37]/50'
+                    ? 'bg-[var(--bg-surface-muted)] border-[var(--border-subtle-card)] opacity-80'
+                    : 'bg-[var(--bg-card)] border-[var(--border-subtle-card)] hover:border-[var(--border-gold)]'
                 }`}
               >
-                <div>
+                <div className="min-w-0">
                   {/* Ticket Header */}
-                  <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                    <div>
-                      <span className="font-mono text-xs font-bold text-[#D4AF37] block">
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle-card)]">
+                    <div className="min-w-0">
+                      <span className="font-mono text-sm font-bold text-[var(--text-accent)] block truncate">
                         {t.ticketNumber}
                       </span>
-                      <span className="text-[10px] text-stone-400 font-mono">
+                      <span className="text-sm text-[var(--text-body-muted)] font-mono">
                         Order #{t.orderCode}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                       {t.priority === 'urgent' && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse">
+                        <span className="px-2 py-0.5 rounded-md text-sm font-bold uppercase tracking-wider bg-[#B3261E] text-white">
                           Urgent
                         </span>
                       )}
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        className={`px-2.5 py-0.5 rounded-md text-sm font-bold uppercase tracking-wider border ${
                           isQueued
-                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                            ? 'bg-[var(--status-info-bg)] text-[var(--status-info-text)] border-[var(--status-info-border)]'
                             : isCooking
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border-[var(--status-warning-border)]'
                             : isPlated
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                            : 'bg-stone-800 text-stone-400'
+                            ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-border)]'
+                            : 'bg-[var(--bg-surface-muted)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)]'
                         }`}
                       >
                         {t.status.replace(/_/g, ' ')}
@@ -285,12 +298,12 @@ export function KitchenDisplayDashboard() {
                   </div>
 
                   {/* Station & Timestamps */}
-                  <div className="py-2.5 flex items-center justify-between text-[11px] text-stone-400">
-                    <span className="flex items-center gap-1 font-semibold text-stone-300">
-                      <span>{stationInfo.icon}</span>
-                      <span>{stationInfo.label}</span>
+                  <div className="py-2.5 flex items-center justify-between gap-2 text-sm text-[var(--text-body-muted)]">
+                    <span className="flex items-center gap-1.5 font-semibold text-[var(--text-primary)] min-w-0 truncate">
+                      <span aria-hidden="true">{stationInfo.icon}</span>
+                      <span className="truncate">{stationInfo.label}</span>
                     </span>
-                    <span className="font-mono text-[10px]">
+                    <span className="font-mono text-sm price-tabular shrink-0">
                       {new Date(t.createdAt).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
@@ -300,7 +313,7 @@ export function KitchenDisplayDashboard() {
 
                   {/* Special Instructions */}
                   {t.specialInstructions && (
-                    <div className="mb-3 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[10px] text-amber-200">
+                    <div className="mb-3 p-2.5 bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] rounded-lg text-sm text-[var(--status-warning-text)]">
                       <span className="font-bold">Chef Note:</span> {t.specialInstructions}
                     </div>
                   )}
@@ -310,16 +323,16 @@ export function KitchenDisplayDashboard() {
                     {t.items.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between text-xs py-1 px-2 rounded bg-black/30 border border-white/5"
+                        className="flex items-center justify-between gap-2 text-sm py-1.5 px-2.5 rounded bg-[var(--bg-surface-muted)] border border-[var(--border-subtle-card)]"
                       >
-                        <span className="font-medium text-white">
-                          <span className="text-[#D4AF37] font-bold mr-1.5">
+                        <span className="font-medium text-[var(--text-primary)] min-w-0 break-words">
+                          <span className="text-[var(--text-accent)] font-bold mr-1.5">
                             {item.quantity}x
                           </span>
                           {item.nameSnapshot}
                         </span>
                         {item.portionSnapshot && (
-                          <span className="text-[10px] text-stone-400">
+                          <span className="text-sm text-[var(--text-body-muted)] shrink-0">
                             {item.portionSnapshot}
                           </span>
                         )}
@@ -329,42 +342,45 @@ export function KitchenDisplayDashboard() {
                 </div>
 
                 {/* Workflow Action Buttons */}
-                <div className="pt-4 mt-3 border-t border-white/10">
+                <div className="pt-4 mt-3 border-t border-[var(--border-subtle-card)]">
                   {isQueued && (
                     <button
+                      type="button"
                       onClick={() => handleTicketAction(t.id, 'start_cooking')}
                       disabled={isActionLoading}
-                      className="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-all"
+                      className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-[#92400E] hover:bg-[#78350F] text-white font-bold text-sm flex items-center justify-center gap-2 shadow transition-colors"
                     >
-                      <Flame className="w-3.5 h-3.5" />
+                      <Flame className="w-4 h-4 shrink-0" />
                       <span>{isActionLoading ? 'Starting...' : 'Put Pot on Fire'}</span>
                     </button>
                   )}
 
                   {isCooking && (
                     <button
+                      type="button"
                       onClick={() => handleTicketAction(t.id, 'mark_plated')}
                       disabled={isActionLoading}
-                      className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-all"
+                      className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-[#166534] hover:bg-[#14532D] text-white font-bold text-sm flex items-center justify-center gap-2 shadow transition-colors"
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-4 h-4 shrink-0" />
                       <span>{isActionLoading ? 'Plating...' : 'Mark Plated & Ready'}</span>
                     </button>
                   )}
 
                   {isPlated && (
                     <button
+                      type="button"
                       onClick={() => handleTicketAction(t.id, 'mark_handed_off')}
                       disabled={isActionLoading}
-                      className="w-full py-2 px-3 rounded-xl bg-[#6B1230] hover:bg-[#85163c] text-white border border-[#D4AF37] font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-all"
+                      className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-[#6B1230] hover:bg-[#85163c] text-[#F7EFD9] border border-[#D4AF37] font-bold text-sm flex items-center justify-center gap-2 shadow transition-colors"
                     >
-                      <PackageCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+                      <PackageCheck className="w-4 h-4 text-[#D4AF37] shrink-0" />
                       <span>{isActionLoading ? 'Handing off...' : 'Hand Off to Packaging'}</span>
                     </button>
                   )}
 
                   {isHandedOff && (
-                    <div className="text-center text-[11px] text-emerald-400/80 font-mono py-1">
+                    <div className="text-center text-sm text-[var(--text-money-positive)] font-mono py-2">
                       ✓ Handed off to Packaging &amp; Dispatch
                     </div>
                   )}

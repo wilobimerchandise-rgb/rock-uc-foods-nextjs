@@ -100,11 +100,11 @@ describe('Phase 3: Customer Ordering & Checkout Engine', () => {
       // Verify phone normalized to E.164
       expect(order.customerPhone).toBe('+2348033729125');
 
-      // Verify 15-minute expiry
+      // Verify 7-hour expiry (Section 17.1 / 31.5 N1)
       const createdTime = new Date(order.createdAt).getTime();
       const expiresTime = new Date(order.expiresAt).getTime();
       const diffMinutes = (expiresTime - createdTime) / (60 * 1000);
-      expect(Math.round(diffMinutes)).toBe(15);
+      expect(Math.round(diffMinutes)).toBe(420);
     });
   });
 
@@ -212,7 +212,7 @@ describe('Phase 3: Customer Ordering & Checkout Engine', () => {
       `);
 
       // Verify order_items stored tier name & jsonb snapshot
-      const itemRow = await db.query(`SELECT selected_tier_name, selected_options_snapshot FROM order_items WHERE order_id = '55555555-5555-5555-5555-555555555555'`);
+      const itemRow = await db.query<{ selected_tier_name: string }>(`SELECT selected_tier_name, selected_options_snapshot FROM order_items WHERE order_id = '55555555-5555-5555-5555-555555555555'`);
       expect(itemRow.rows[0].selected_tier_name).toBe('Standard');
 
       // 3. Attempting to confirm payment on this expired order triggers an exception

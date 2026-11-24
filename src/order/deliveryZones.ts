@@ -5,8 +5,9 @@
  */
 
 import { DeliveryZone } from '../types/order';
+import { recordAuditEvent } from '../lib/auth';
 
-export const LAGOS_DELIVERY_ZONES: DeliveryZone[] = [
+const INITIAL_LAGOS_DELIVERY_ZONES: DeliveryZone[] = [
   {
     id: 'zone-1-ikeja',
     code: 'ZONE_1',
@@ -54,6 +55,19 @@ export const LAGOS_DELIVERY_ZONES: DeliveryZone[] = [
   },
 ];
 
+function cloneZone(z: DeliveryZone): DeliveryZone {
+  return { ...z, areas: [...z.areas] };
+}
+
+export const LAGOS_DELIVERY_ZONES: DeliveryZone[] = INITIAL_LAGOS_DELIVERY_ZONES.map(cloneZone);
+
+export function getAllDeliveryZones(includeInactive: boolean = false): DeliveryZone[] {
+  const list = includeInactive
+    ? LAGOS_DELIVERY_ZONES
+    : LAGOS_DELIVERY_ZONES.filter((z) => z.isActive);
+  return list.slice().sort((a, b) => a.sortOrder - b.sortOrder).map(cloneZone);
+}
+
 export function getDeliveryZoneById(id?: string): DeliveryZone | undefined {
   if (!id) return undefined;
   return LAGOS_DELIVERY_ZONES.find((z) => z.id === id || z.code === id);
@@ -64,8 +78,85 @@ export function calculateDeliveryFeeKobo(type: 'delivery' | 'collection', zoneId
     return 0n;
   }
   const zone = getDeliveryZoneById(zoneId);
-  if (!zone) {
-    throw new Error('Please select a valid delivery zone for Lagos delivery.');
+  if (!zone || !zone.isActive) {
+    throw new Error('Please select an active delivery zone for Lagos delivery.');
   }
   return zone.feeKobo;
+}
+
+export interface UpdateDeliveryZoneInput {
+  id: string;
+  feeKobo?: bigint;
+  isActive?: boolean;
+  name?: string;
+  areas?: string[];
+  actorId: string;
+  actorRole: string;
+}
+
+export function updateDeliveryZone(input: UpdateDeliveryZoneInput): DeliveryZone {
+  if (input.actorRole !== 'owner') {
+    throw new Error('Only owner accounts may update delivery zone pricing or status.');
+  }
+
+  const zone = getDeliveryZoneById(input.id);
+  if (!zone) {
+    throw new Error(`Delivery zone '${input.id}' not found.`);
+  }
+
+  if (input.feeKobo !== undefined && input.feeKobo < 0n) {
+    throw new Error('Delivery fee cannot be negative.');
+  }
+
+  if (input.name !== undefined && input.name.trim().length < 2) {
+    throw new Error('Delivery zone name must be at least 2 characters.');
+  }
+
+  const before = {
+    name: zone.name,
+    feeKobo: zone.feeKobo.toString(),
+    isActive: zone.isActive,
+    areas: [...zone.areas],
+  };
+
+  if (input.feeKobo !== undefined) {
+    zone.feeKobo = input.feeKobo;
+  }
+  if (input.isActive !== undefined) {
+    zone.isActive = input.isActive;
+  }
+  if (input.name !== undefined) {
+    zone.name = input.name.trim();
+  }
+  if (input.areas !== undefined) {
+    const cleanedAreas = input.areas.map((a) => a.trim()).filter(Boolean);
+    if (cleanedAreas.length === 0) {
+      throw new Error('Delivery zone must cover at least one Lagos area.');
+    }
+    zone.areas = cleanedAreas;
+  }
+
+  recordAuditEvent({
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    action: 'UPDATE_DELIVERY_ZONE',
+    entity: 'delivery_zones',
+    entityId: zone.id,
+    before,
+    after: {
+      name: zone.name,
+      feeKobo: zone.feeKobo.toString(),
+      isActive: zone.isActive,
+      areas: [...zone.areas],
+    },
+  });
+
+  return cloneZone(zone);
+}
+
+export function resetDeliveryZonesForTesting(): void {
+  LAGOS_DELIVERY_ZONES.length = 0;
+  for (const z of INITIAL_LAGOS_DELIVERY_ZONES) {
+    LAGOS_DELIVERY_ZONES.push(cloneZone(z));
+  }
 }

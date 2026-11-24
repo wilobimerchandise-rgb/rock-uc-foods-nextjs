@@ -471,4 +471,116 @@ describe('Phase 1E: Owner Sign-In with Authenticator Second Step', () => {
       expect(safeNext('https://malicious.com')).toBe('/admin');
     });
   });
+
+  describe('9. Keep Me Signed In (§28.5) & Protected Admin Report/Reconciliation Gates', () => {
+    it('parseRemember only enables 30-day persistence for strict boolean true', async () => {
+      const { parseRemember } = await import('../src/auth/login-core');
+      const {
+        getSessionCookieOptions,
+        getRememberCookieOptions,
+        REMEMBER_MAX_AGE_SECONDS,
+      } = await import('../src/auth/cookies');
+
+      expect(parseRemember(undefined)).toBe(false);
+      expect(parseRemember({ remember: 'true' })).toBe(false);
+      expect(parseRemember({ remember: 1 })).toBe(false);
+      expect(parseRemember({ remember: false })).toBe(false);
+      expect(parseRemember({ remember: true })).toBe(true);
+
+      const sessionOnly = getSessionCookieOptions('tok-abc', false);
+      expect(sessionOnly.maxAge).toBeUndefined();
+      expect(sessionOnly.httpOnly).toBe(true);
+      expect(sessionOnly.sameSite).toBe('lax');
+
+      const remembered = getSessionCookieOptions('tok-abc', true);
+      expect(remembered.maxAge).toBe(REMEMBER_MAX_AGE_SECONDS);
+      expect(REMEMBER_MAX_AGE_SECONDS).toBe(60 * 60 * 24 * 30);
+
+      expect(getRememberCookieOptions(false).maxAge).toBeUndefined();
+      expect(getRememberCookieOptions(true).maxAge).toBe(REMEMBER_MAX_AGE_SECONDS);
+    });
+
+    it('Rejects anonymous access to /api/reports/sales and /api/admin/reconciliation with 401 and allows authenticated staff', async () => {
+      const { NextRequest } = await import('next/server');
+      const salesRoute = await import('../app/api/reports/sales/route');
+      const reconRoute = await import('../app/api/admin/reconciliation/route');
+      const loginRoute = await import('../app/api/auth/login/route');
+      const { SESSION_COOKIE_NAME, REMEMBER_MAX_AGE_SECONDS } = await import('../src/auth/cookies');
+
+      const anonSalesRes = await salesRoute.GET(
+        new NextRequest('http://localhost:3000/api/reports/sales')
+      );
+      expect(anonSalesRes.status).toBe(401);
+
+      const anonReconRes = await reconRoute.POST(
+        new NextRequest('http://localhost:3000/api/admin/reconciliation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ csvContent: 'date,narration,credit\n2026-11-17,TEST,1000' }),
+        })
+      );
+      expect(anonReconRes.status).toBe(401);
+
+      // Sign in as staff WITHOUT remember -> session-only cookie (maxAge undefined)
+      const sessionLoginRes = await loginRoute.POST(
+        new NextRequest('http://localhost:3000/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: 'http://localhost:3000',
+            Host: 'localhost:3000',
+          },
+          body: JSON.stringify({
+            email: 'staff@rockucfoods.com',
+            password: 'StaffService2026!',
+            remember: false,
+          }),
+        })
+      );
+      expect(sessionLoginRes.status).toBe(200);
+      expect(sessionLoginRes.cookies.get(SESSION_COOKIE_NAME)?.maxAge).toBeUndefined();
+
+      // Sign in as staff WITH remember -> 30-day persistent cookie
+      const loginRes = await loginRoute.POST(
+        new NextRequest('http://localhost:3000/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: 'http://localhost:3000',
+            Host: 'localhost:3000',
+          },
+          body: JSON.stringify({
+            email: 'staff@rockucfoods.com',
+            password: 'StaffService2026!',
+            remember: true,
+          }),
+        })
+      );
+      expect(loginRes.status).toBe(200);
+      const tokenCookie = loginRes.cookies.get(SESSION_COOKIE_NAME)?.value;
+      expect(tokenCookie).toBeTruthy();
+      expect(loginRes.cookies.get(SESSION_COOKIE_NAME)?.maxAge).toBe(REMEMBER_MAX_AGE_SECONDS);
+
+      const staffSalesRes = await salesRoute.GET(
+        new NextRequest('http://localhost:3000/api/reports/sales', {
+          headers: { Cookie: `${SESSION_COOKIE_NAME}=${tokenCookie}` },
+        })
+      );
+      expect(staffSalesRes.status).toBe(200);
+
+      const staffReconRes = await reconRoute.POST(
+        new NextRequest('http://localhost:3000/api/admin/reconciliation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: `${SESSION_COOKIE_NAME}=${tokenCookie}`,
+          },
+          body: JSON.stringify({
+            csvContent: 'date,narration,credit\n2026-11-17,TRF RUC-TEST,5000.00',
+          }),
+        })
+      );
+      expect(staffReconRes.status).toBe(200);
+    });
+  });
 });

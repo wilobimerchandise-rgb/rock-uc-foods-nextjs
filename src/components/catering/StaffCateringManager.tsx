@@ -2,9 +2,7 @@
 
 /**
  * ROCK UC FOODS - Staff / Owner Catering & Invoicing Manager
- * (Playbook v2 Section 9, 10 & Section 17 v3 Addendum)
- * Manage bespoke event bookings, generate PDF invoices, track revision history,
- * and verify deposit/balance payment schedules.
+ * (Playbook v2 Section 9, 10, Section 17 v3 Addendum & Section 35)
  */
 
 import React, { useState } from 'react';
@@ -15,8 +13,9 @@ import {
   calculateBulkRefundNotice,
 } from '../../catering/cateringEngine';
 import { generateCateringInvoicePdf } from '../../catering/cateringPdf';
-import { CateringEvent, CateringQuote, EventStatus } from '../../types/catering';
+import { CateringEvent, CateringQuote } from '../../types/catering';
 import { formatNaira, parseNairaToKobo } from '../../lib/money';
+import { maskCustomerPhone } from '../../lib/security';
 import {
   Calendar,
   Users,
@@ -28,26 +27,99 @@ import {
   AlertTriangle,
   RotateCcw,
   Flame,
-  Building2,
-  Clock,
-  Sparkles,
   X,
   CreditCard,
+  CalendarRange,
 } from 'lucide-react';
+
+export interface WeeklyCapacityBucket {
+  weekStartIso: string;
+  weekLabel: string;
+  events: CateringEvent[];
+  totalGuests: number;
+  liveCookingEventsCount: number;
+  depositSecuredCount: number;
+  sameDayClashDates: string[];
+  isHighLoad: boolean;
+}
+
+export function buildWeeklyCapacityBuckets(events: CateringEvent[]): WeeklyCapacityBucket[] {
+  const activeEvents = events.filter((ev) => ev.status !== 'cancelled');
+  const buckets = new Map<string, CateringEvent[]>();
+
+  for (const ev of activeEvents) {
+    const parsed = new Date(`${ev.eventDate}T12:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) continue;
+    const utcDay = parsed.getUTCDay(); // 0=Sun..6=Sat
+    const diffToMonday = utcDay === 0 ? -6 : 1 - utcDay;
+    const monday = new Date(parsed.getTime() + diffToMonday * 24 * 60 * 60 * 1000);
+    const weekStartIso = monday.toISOString().slice(0, 10);
+    const existing = buckets.get(weekStartIso) || [];
+    existing.push(ev);
+    buckets.set(weekStartIso, existing);
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([weekStartIso, weekEvents]) => {
+      const sorted = weekEvents.slice().sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+      const dateCounts = new Map<string, number>();
+      let totalGuests = 0;
+      let liveCookingEventsCount = 0;
+      let depositSecuredCount = 0;
+
+      for (const ev of sorted) {
+        totalGuests += Number(ev.guestCount) || 0;
+        if (ev.liveCookingRequested) liveCookingEventsCount += 1;
+        if (ev.status === 'deposit_paid' || ev.status === 'fully_paid' || ev.status === 'completed') {
+          depositSecuredCount += 1;
+        }
+        dateCounts.set(ev.eventDate, (dateCounts.get(ev.eventDate) || 0) + 1);
+      }
+
+      const sameDayClashDates = Array.from(dateCounts.entries())
+        .filter(([, count]) => count >= 2)
+        .map(([dt]) => dt);
+
+      const mondayDate = new Date(`${weekStartIso}T12:00:00Z`);
+      const sundayDate = new Date(mondayDate.getTime() + 6 * 24 * 60 * 60 * 1000);
+      const weekLabel = `${weekStartIso} to ${sundayDate.toISOString().slice(0, 10)}`;
+
+      return {
+        weekStartIso,
+        weekLabel,
+        events: sorted,
+        totalGuests,
+        liveCookingEventsCount,
+        depositSecuredCount,
+        sameDayClashDates,
+        isHighLoad: totalGuests >= 300 || sameDayClashDates.length > 0 || sorted.length >= 3,
+      };
+    });
+}
 
 interface StaffCateringManagerProps {
   currentUserRole: 'owner' | 'staff' | 'developer';
   currentUserId: string;
+  hasMfaVerified?: boolean;
+}
+
+function koboToInputNaira(kobo: bigint): string {
+  const whole = kobo / 100n;
+  const rem = kobo % 100n;
+  return rem === 0n ? whole.toString() : `${whole.toString()}.${rem.toString().padStart(2, '0')}`;
 }
 
 export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
   currentUserRole,
   currentUserId,
+  hasMfaVerified = false,
 }) => {
   const isOwnerOrDev = currentUserRole === 'owner' || currentUserRole === 'developer';
 
   const [events, setEvents] = useState<CateringEvent[]>(() => cateringRepository.getAll());
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'weekly'>('list');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Quote Revision Modal
@@ -80,7 +152,20 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
   const handleDownloadPdf = async (event: CateringEvent, quote: CateringQuote) => {
     try {
       notify(`Generating official PDF invoice for ${event.eventCode} Rev ${quote.revisionNumber}...`);
-      const { pdfBytes, filename } = await generateCateringInvoicePdf(event, quote);
+      let bankDetailsOverride: { bankName: string; accountName: string; accountNumber: string } | null = null;
+      try {
+        const res = await fetch('/api/ops/bank-details', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          bankDetailsOverride = data?.configured && data?.bankDetails ? data.bankDetails : null;
+        }
+      } catch {
+        bankDetailsOverride = null;
+      }
+
+      const { pdfBytes, filename } = await generateCateringInvoicePdf(event, quote, {
+        bankDetails: bankDetailsOverride,
+      });
 
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
@@ -120,14 +205,14 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
     const latestQuote = event.quotes[event.quotes.length - 1];
     if (latestQuote) {
       setRevDepositPct(latestQuote.depositPercentage);
-      setRevLogisticsNaira((Number(latestQuote.logisticsFeeKobo) / 100).toString());
-      setRevServiceNaira((Number(latestQuote.serviceFeeKobo) / 100).toString());
+      setRevLogisticsNaira(koboToInputNaira(latestQuote.logisticsFeeKobo));
+      setRevServiceNaira(koboToInputNaira(latestQuote.serviceFeeKobo));
       setRevNotes(latestQuote.notes || '');
       setRevItems(
         latestQuote.items.map((i) => ({
           name: i.name,
           portionLabel: i.portionLabel || '',
-          priceNaira: (Number(i.unitPriceKobo) / 100).toString(),
+          priceNaira: koboToInputNaira(i.unitPriceKobo),
           quantity: i.quantity,
         }))
       );
@@ -137,7 +222,12 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
       setRevServiceNaira('100000');
       setRevNotes('');
       setRevItems([
-        { name: 'Smoky Party Jollof & Fried Rice', portionLabel: `${event.guestCount} Servings`, priceNaira: '5000', quantity: event.guestCount },
+        {
+          name: 'Smoky Party Jollof & Fried Rice',
+          portionLabel: `${event.guestCount} Servings`,
+          priceNaira: '5000',
+          quantity: event.guestCount,
+        },
       ]);
     }
   };
@@ -185,14 +275,15 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
   });
 
   return (
-    <div className="bg-[#0B0A09] text-[#F7EFD9] min-h-screen p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+    <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] min-h-screen p-4 md:p-6 max-w-5xl mx-auto space-y-6 min-w-0 w-full max-w-full">
       {/* Top Banner */}
       {notification && (
         <div
-          className={`p-3 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 ${
+          role={notification.type === 'error' ? 'alert' : 'status'}
+          className={`p-3.5 rounded-xl text-sm font-semibold flex items-center gap-2 border ${
             notification.type === 'error'
-              ? 'bg-[#B3261E] text-white'
-              : 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/50'
+              ? 'bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] border-[var(--status-danger-border)]'
+              : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral-text)] border-[var(--status-neutral-border)]'
           }`}
         >
           {notification.type === 'error' ? (
@@ -205,36 +296,147 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-serif font-bold text-[#F7EFD9]">Events &amp; Bulk Catering Quotes</h1>
-            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[#D4AF37] text-[#0B0A09]">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle-card)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-serif font-bold text-[var(--text-primary)]">
+              Events &amp; Bulk Catering Quotes
+            </h1>
+            <span className="text-sm uppercase font-bold px-2.5 py-0.5 rounded-md bg-[#D4AF37] text-[#0B0A09]">
               Role: {currentUserRole}
             </span>
           </div>
-          <p className="text-xs text-[#F7EFD9]/60 mt-1">
+          <p className="text-sm text-[var(--text-body-muted)] mt-1">
             Bespoke event catering quotes, 70/30 deposit schedules, revision history, and branded PDF invoices.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-[#D4AF37] bg-[#17120F] px-3 py-1.5 rounded border border-white/10">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            data-testid="catering-view-list"
+            onClick={() => setViewMode('list')}
+            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${
+              viewMode === 'list'
+                ? 'bg-[#6B1230] text-[#F7EFD9] border-[#D4AF37]'
+                : 'bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-card)]'
+            }`}
+          >
+            Event Quotes
+          </button>
+          <button
+            type="button"
+            data-testid="catering-view-weekly"
+            onClick={() => setViewMode('weekly')}
+            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all inline-flex items-center gap-1.5 ${
+              viewMode === 'weekly'
+                ? 'bg-[#6B1230] text-[#F7EFD9] border-[#D4AF37]'
+                : 'bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-card)]'
+            }`}
+          >
+            <CalendarRange className="w-4 h-4 shrink-0" />
+            <span>Weekly Capacity</span>
+          </button>
+          <span className="text-sm font-mono price-tabular text-[var(--text-accent)] bg-[var(--bg-card)] px-3.5 py-2 rounded-xl border border-[var(--border-card)] min-h-[44px] inline-flex items-center">
             {events.length} Events Logged
           </span>
         </div>
       </div>
 
+      {/* Weekly Catering Capacity Schedule View */}
+      {viewMode === 'weekly' ? (
+        <section className="space-y-4" data-testid="catering-weekly-capacity-view">
+          {buildWeeklyCapacityBuckets(events).length === 0 ? (
+            <div className="p-8 text-center bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle-card)] text-[var(--text-body-muted)] text-sm">
+              No active catering events scheduled across upcoming weeks.
+            </div>
+          ) : (
+            buildWeeklyCapacityBuckets(events).map((bucket) => (
+              <div
+                key={bucket.weekStartIso}
+                className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-5 space-y-4"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle-card)]">
+                  <div>
+                    <h2 className="text-lg font-serif font-bold text-[var(--text-primary)]">
+                      Week of {bucket.weekLabel}
+                    </h2>
+                    <p className="text-sm text-[var(--text-body-muted)] price-tabular">
+                      {bucket.events.length} Active Event(s) &bull; {bucket.totalGuests} Total Guests &bull;{' '}
+                      {bucket.liveCookingEventsCount} Live-Cooking Station(s) &bull; {bucket.depositSecuredCount} Secured
+                    </p>
+                  </div>
+
+                  <span
+                    className={`text-sm font-bold uppercase px-3 py-1 rounded-md border shrink-0 ${
+                      bucket.isHighLoad
+                        ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border-[var(--status-warning-border)]'
+                        : 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-border)]'
+                    }`}
+                  >
+                    {bucket.sameDayClashDates.length > 0
+                      ? `Clash Alert: ${bucket.sameDayClashDates.join(', ')}`
+                      : bucket.isHighLoad
+                      ? 'High Kitchen Load'
+                      : 'Normal Capacity'}
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {bucket.events.map((ev) => (
+                    <div
+                      key={ev.id}
+                      className="p-3.5 rounded-xl bg-[var(--bg-surface-muted)] border border-[var(--border-subtle-card)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm"
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-bold text-[var(--text-accent)] price-tabular">
+                            {ev.eventDate}
+                          </span>
+                          <span className="font-bold text-[var(--text-primary)]">{ev.clientName}</span>
+                          <span className="font-mono text-[var(--text-body-muted)]">({ev.eventCode})</span>
+                        </div>
+                        <p className="text-[var(--text-body-muted)]">
+                          {ev.eventType} &bull; {ev.guestCount} Guests
+                          {ev.liveCookingRequested ? ' • Live Cooking Station' : ''}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-card)] text-sm font-semibold uppercase text-[var(--text-accent)]">
+                          {ev.status.replace(/_/g, ' ')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterStatus('all');
+                            setViewMode('list');
+                          }}
+                          className="min-h-[44px] px-3 py-1.5 rounded-lg bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/60 text-sm font-semibold"
+                        >
+                          Manage Quote
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </section>
+      ) : (
+      <>
       {/* Status Filter Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs">
+      <div className="flex gap-2 overflow-x-auto [overscroll-behavior-x:contain] no-scrollbar pb-1 text-sm min-w-0 max-w-full">
         {['all', 'inquiry', 'quote_sent', 'deposit_paid', 'fully_paid', 'completed', 'cancelled'].map((st) => (
           <button
+            type="button"
             key={st}
             onClick={() => setFilterStatus(st)}
-            className={`px-3 py-1.5 rounded-lg font-semibold shrink-0 transition-all ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl font-semibold shrink-0 transition-all border ${
               filterStatus === st
-                ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/50'
-                : 'bg-[#17120F] text-white/60 hover:text-white border border-white/5'
+                ? 'bg-[#6B1230] text-[#F7EFD9] border-[#D4AF37]'
+                : 'bg-[var(--bg-card)] text-[var(--text-body-muted)] hover:text-[var(--text-primary)] border-[var(--border-subtle-card)]'
             }`}
           >
             {st.replace(/_/g, ' ')}
@@ -243,9 +445,9 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
       </div>
 
       {/* Events List */}
-      <div className="space-y-4">
+      <div className="space-y-4 min-w-0">
         {filteredEvents.length === 0 ? (
-          <div className="p-8 text-center bg-[#17120F] rounded-xl border border-white/5 text-white/50 text-xs">
+          <div className="p-8 text-center bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle-card)] text-[var(--text-body-muted)] text-sm">
             No events found matching this status.
           </div>
         ) : (
@@ -255,112 +457,126 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
             return (
               <div
                 key={event.id}
-                className="bg-[#17120F] border border-white/10 hover:border-[#D4AF37]/40 rounded-xl p-5 space-y-4 transition-all"
+                className="bg-[var(--bg-card)] border border-[var(--border-subtle-card)] hover:border-[var(--border-gold)] rounded-xl p-5 space-y-4 transition-all min-w-0"
               >
                 {/* Event Top Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono font-bold text-sm text-[#D4AF37]">{event.eventCode}</span>
-                    <h3 className="font-serif font-bold text-base text-[#F7EFD9]">{event.clientName}</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle-card)]">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="font-mono font-bold text-base text-[var(--text-accent)]">
+                      {event.eventCode}
+                    </span>
+                    <h3 className="font-serif font-bold text-base text-[var(--text-primary)]">
+                      {event.clientName}
+                    </h3>
                     <span
-                      className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                      className={`text-sm uppercase font-bold px-2.5 py-0.5 rounded-md border ${
                         event.status === 'fully_paid'
-                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                          ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-border)]'
                           : event.status === 'deposit_paid'
-                          ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/50'
+                          ? 'bg-[#6B1230] text-[#F7EFD9] border-[#D4AF37]/60'
                           : event.status === 'quote_sent'
-                          ? 'bg-blue-950 text-blue-300 border border-blue-700'
-                          : 'bg-amber-950 text-amber-300 border border-amber-700'
+                          ? 'bg-[var(--status-info-bg)] text-[var(--status-info-text)] border-[var(--status-info-border)]'
+                          : 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border-[var(--status-warning-border)]'
                       }`}
                     >
                       {event.status.replace(/_/g, ' ')}
                     </span>
                   </div>
 
-                  <div className="text-xs text-white/60 flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-[#D4AF37]" /> {event.eventDate}
+                  <div className="text-sm text-[var(--text-body-muted)] flex flex-wrap items-center gap-3 price-tabular">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-[var(--text-accent)] shrink-0" /> {event.eventDate}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5 text-[#D4AF37]" /> {event.guestCount} Guests
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-[var(--text-accent)] shrink-0" /> {event.guestCount} Guests
                     </span>
                   </div>
                 </div>
 
                 {/* Event Specifications */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-[#0B0A09] p-3.5 rounded-xl border border-white/5">
-                  <div>
-                    <span className="text-white/40 block text-[10px] uppercase tracking-wider">Event &amp; Venue</span>
-                    <p className="font-semibold text-[#F7EFD9] mt-0.5">{event.eventType}</p>
-                    <p className="text-white/70 text-[11px] flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3 h-3 text-[#D4AF37] shrink-0" /> {event.venueAddress}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-[var(--bg-surface-muted)] p-4 rounded-xl border border-[var(--border-subtle-card)]">
+                  <div className="min-w-0">
+                    <span className="text-[var(--text-body-muted)] block text-sm uppercase font-semibold tracking-wider">
+                      Event &amp; Venue
+                    </span>
+                    <p className="font-semibold text-[var(--text-primary)] mt-1">{event.eventType}</p>
+                    <p className="text-[var(--text-body-muted)] text-sm flex items-center gap-1.5 mt-1 break-words">
+                      <MapPin className="w-4 h-4 text-[var(--text-accent)] shrink-0" /> {event.venueAddress}
                     </p>
                     {event.liveCookingRequested && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-700 mt-1.5 font-semibold">
-                        <Flame className="w-3 h-3 text-amber-400" /> Live Cooking Station Requested
+                      <span className="inline-flex items-center gap-1.5 text-sm text-[var(--status-warning-text)] bg-[var(--status-warning-bg)] px-2.5 py-1 rounded-md border border-[var(--status-warning-border)] mt-2 font-semibold">
+                        <Flame className="w-4 h-4 shrink-0" /> Live Cooking Station Requested
                       </span>
                     )}
                   </div>
 
-                  <div>
-                    <span className="text-white/40 block text-[10px] uppercase tracking-wider">Client Contact</span>
-                    <p className="font-semibold text-[#F7EFD9] mt-0.5">{event.clientPhone}</p>
-                    {event.clientEmail && <p className="text-white/60 text-[11px]">{event.clientEmail}</p>}
+                  <div className="min-w-0">
+                    <span className="text-[var(--text-body-muted)] block text-sm uppercase font-semibold tracking-wider">
+                      Client Contact
+                    </span>
+                    <p className="font-semibold font-mono price-tabular text-[var(--text-primary)] mt-1">
+                      {maskCustomerPhone(event.clientPhone, currentUserRole, hasMfaVerified)}
+                    </p>
+                    {event.clientEmail && (
+                      <p className="text-[var(--text-body-muted)] text-sm break-all">{event.clientEmail}</p>
+                    )}
                     {event.specialNotes && (
-                      <p className="text-amber-200/80 italic text-[11px] mt-1">Note: {event.specialNotes}</p>
+                      <p className="text-[var(--status-warning-text)] italic text-sm mt-1">
+                        Note: {event.specialNotes}
+                      </p>
                     )}
                   </div>
                 </div>
 
                 {/* Quote Schedule Box */}
                 {activeQuote ? (
-                  <div className="p-4 bg-[#140F0D] rounded-xl border border-[#D4AF37]/30 space-y-3">
-                    <div className="flex items-center justify-between">
+                  <div className="p-4 bg-[var(--bg-surface-muted)] rounded-xl border border-[var(--border-card)] space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#D4AF37]" />
-                        <span className="font-serif font-bold text-xs text-[#F7EFD9]">
+                        <FileText className="w-4 h-4 text-[var(--text-accent)] shrink-0" />
+                        <span className="font-serif font-bold text-base text-[var(--text-primary)]">
                           Quote Revision {activeQuote.revisionNumber} ({activeQuote.items.length} line items)
                         </span>
                       </div>
-                      <span className="font-mono font-bold text-sm text-[#D4AF37]">
+                      <span className="font-mono font-bold text-base text-[var(--text-accent)] price-tabular">
                         Total: {formatNaira(activeQuote.totalKobo)}
                       </span>
                     </div>
 
                     {/* Deposit & Balance Schedule Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-[#0B0A09] p-3 rounded-lg border border-white/5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm bg-[var(--bg-card)] p-3.5 rounded-xl border border-[var(--border-subtle-card)]">
                       <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-white/60 text-[11px]">70% Booking Deposit:</span>
+                        <div className="flex justify-between items-center gap-2 mb-1">
+                          <span className="text-[var(--text-body-muted)] text-sm">70% Booking Deposit:</span>
                           <span
-                            className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded ${
+                            className={`text-sm font-bold uppercase px-2 py-0.5 rounded-md border ${
                               activeQuote.depositStatus === 'paid'
-                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-700'
-                                : 'bg-amber-950 text-amber-300 border border-amber-700'
+                                ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-border)]'
+                                : 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border-[var(--status-warning-border)]'
                             }`}
                           >
                             {activeQuote.depositStatus}
                           </span>
                         </div>
-                        <span className="font-mono font-bold text-[#F7EFD9] text-sm">
+                        <span className="font-mono font-bold text-[var(--text-primary)] text-base price-tabular">
                           {formatNaira(activeQuote.depositKobo)}
                         </span>
                       </div>
 
                       <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-white/60 text-[11px]">30% Final Balance:</span>
+                        <div className="flex justify-between items-center gap-2 mb-1">
+                          <span className="text-[var(--text-body-muted)] text-sm">30% Final Balance:</span>
                           <span
-                            className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded ${
+                            className={`text-sm font-bold uppercase px-2 py-0.5 rounded-md border ${
                               activeQuote.balanceStatus === 'paid'
-                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-700'
-                                : 'bg-black/40 text-white/50 border border-white/10'
+                                ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-border)]'
+                                : 'bg-[var(--bg-surface-muted)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)]'
                             }`}
                           >
                             {activeQuote.balanceStatus}
                           </span>
                         </div>
-                        <span className="font-mono font-bold text-[#F7EFD9] text-sm">
+                        <span className="font-mono font-bold text-[var(--text-primary)] text-base price-tabular">
                           {formatNaira(activeQuote.balanceKobo)}
                         </span>
                       </div>
@@ -369,56 +585,64 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
                     {/* Quote Action Bar */}
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
+                        type="button"
                         onClick={() => handleDownloadPdf(event, activeQuote)}
-                        className="bg-[#6B1230] hover:bg-[#85163C] text-[#F7EFD9] border border-[#D4AF37]/50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow"
+                        className="min-h-[44px] bg-[#6B1230] hover:bg-[#85163C] text-[#F7EFD9] border border-[#D4AF37]/60 px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 shadow"
                       >
-                        <Download className="w-3.5 h-3.5 text-[#D4AF37]" /> Download Official PDF Invoice
+                        <Download className="w-4 h-4 text-[#D4AF37] shrink-0" /> Download Official PDF Invoice
                       </button>
 
                       {isOwnerOrDev && activeQuote.depositStatus !== 'paid' && (
                         <button
+                          type="button"
                           onClick={() => handleVerifyDeposit(event, activeQuote)}
-                          className="bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                          className="min-h-[44px] bg-[var(--status-success-bg)] hover:opacity-90 text-[var(--status-success-text)] border border-[var(--status-success-border)] px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
                         >
-                          <CreditCard className="w-3.5 h-3.5" /> Confirm 70% Deposit
+                          <CreditCard className="w-4 h-4 shrink-0" /> Confirm 70% Deposit
                         </button>
                       )}
 
                       {isOwnerOrDev && activeQuote.depositStatus === 'paid' && activeQuote.balanceStatus !== 'paid' && (
                         <button
+                          type="button"
                           onClick={() => handleVerifyBalance(event, activeQuote)}
-                          className="bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                          className="min-h-[44px] bg-[var(--status-success-bg)] hover:opacity-90 text-[var(--status-success-text)] border border-[var(--status-success-border)] px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
                         >
-                          <CreditCard className="w-3.5 h-3.5" /> Confirm 30% Balance
+                          <CreditCard className="w-4 h-4 shrink-0" /> Confirm 30% Balance
                         </button>
                       )}
 
                       {isOwnerOrDev && (
                         <button
+                          type="button"
                           onClick={() => openRevisionModal(event)}
-                          className="bg-[#17120F] border border-white/15 hover:border-[#D4AF37] text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ml-auto"
+                          className="min-h-[44px] bg-[var(--bg-card)] border border-[var(--border-card)] hover:border-[var(--border-gold)] text-[var(--text-primary)] px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 ml-auto"
                         >
-                          <Plus className="w-3.5 h-3.5 text-[#D4AF37]" /> Create Revision {event.quotes.length + 1}
+                          <Plus className="w-4 h-4 text-[var(--text-accent)] shrink-0" /> Create Revision {event.quotes.length + 1}
                         </button>
                       )}
 
                       <button
+                        type="button"
                         onClick={() => handleOpenRefundCalc(event, activeQuote)}
-                        className="bg-black/30 hover:bg-black/60 text-white/60 hover:text-white px-2.5 py-1.5 rounded text-xs flex items-center gap-1"
+                        className="min-h-[44px] bg-[var(--bg-card)] border border-[var(--border-subtle-card)] hover:border-[var(--border-gold)] text-[var(--text-body-muted)] hover:text-[var(--text-primary)] px-3.5 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
                       >
-                        <RotateCcw className="w-3 h-3" /> Refund Policy Advice
+                        <RotateCcw className="w-4 h-4 shrink-0" /> Refund Policy Advice
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="p-4 bg-[#0B0A09] rounded-xl border border-white/5 flex items-center justify-between">
-                    <span className="text-xs text-white/50">No quote generated for this inquiry yet.</span>
+                  <div className="p-4 bg-[var(--bg-surface-muted)] rounded-xl border border-[var(--border-subtle-card)] flex flex-wrap items-center justify-between gap-3">
+                    <span className="text-sm text-[var(--text-body-muted)]">
+                      No quote generated for this inquiry yet.
+                    </span>
                     {isOwnerOrDev && (
                       <button
+                        type="button"
                         onClick={() => openRevisionModal(event)}
-                        className="btn-luxury px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+                        className="btn-luxury px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-1.5"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Generate Quote Revision 1
+                        <Plus className="w-4 h-4 shrink-0" /> Generate Quote Revision 1
                       </button>
                     )}
                   </div>
@@ -428,51 +652,72 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
           })
         )}
       </div>
+      </>
+      )}
 
       {/* Create / Revise Quote Modal */}
       {revisionEvent && (
-        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-[#17120F] border border-[#D4AF37] rounded-2xl max-w-2xl w-full p-6 text-[#F7EFD9] space-y-4 my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="font-serif font-bold text-lg text-[#F7EFD9]">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="catering-revise-modal-title"
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+        >
+          <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl max-w-2xl w-full p-6 text-[var(--text-primary)] space-y-4 my-auto">
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle-card)]">
+              <h3 id="catering-revise-modal-title" className="font-serif font-bold text-lg text-[var(--text-primary)]">
                 Generate Quote Revision {revisionEvent.quotes.length + 1} for {revisionEvent.clientName}
               </h3>
-              <button onClick={() => setRevisionEvent(null)} className="text-white/60 hover:text-white">
+              <button
+                type="button"
+                aria-label="Close Quote Revision modal"
+                onClick={() => setRevisionEvent(null)}
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg text-[var(--text-body-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCommitRevision} className="space-y-4 text-xs">
-              <div className="grid grid-cols-3 gap-3">
+            <form onSubmit={handleCommitRevision} className="space-y-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-white/70 mb-1">Deposit Percentage (%)</label>
+                  <label htmlFor="rev-deposit-pct" className="block text-[var(--text-body-muted)] font-semibold mb-1">
+                    Deposit Percentage (%)
+                  </label>
                   <input
+                    id="rev-deposit-pct"
                     type="number"
                     min={10}
                     max={100}
                     value={revDepositPct}
                     onChange={(e) => setRevDepositPct(Number(e.target.value))}
-                    className="w-full bg-[#0B0A09] border border-white/10 rounded p-2 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg p-2.5 text-sm text-[var(--text-primary)] price-tabular focus:outline-none focus:border-[var(--border-gold)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-white/70 mb-1">Logistics / Transport (₦)</label>
+                  <label htmlFor="rev-logistics-naira" className="block text-[var(--text-body-muted)] font-semibold mb-1">
+                    Logistics / Transport (₦)
+                  </label>
                   <input
+                    id="rev-logistics-naira"
                     type="text"
                     value={revLogisticsNaira}
                     onChange={(e) => setRevLogisticsNaira(e.target.value)}
-                    className="w-full bg-[#0B0A09] border border-white/10 rounded p-2 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg p-2.5 text-sm text-[var(--text-primary)] font-mono price-tabular focus:outline-none focus:border-[var(--border-gold)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-white/70 mb-1">Service &amp; Staff Crew (₦)</label>
+                  <label htmlFor="rev-service-naira" className="block text-[var(--text-body-muted)] font-semibold mb-1">
+                    Service &amp; Staff Crew (₦)
+                  </label>
                   <input
+                    id="rev-service-naira"
                     type="text"
                     value={revServiceNaira}
                     onChange={(e) => setRevServiceNaira(e.target.value)}
-                    className="w-full bg-[#0B0A09] border border-white/10 rounded p-2 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg p-2.5 text-sm text-[var(--text-primary)] font-mono price-tabular focus:outline-none focus:border-[var(--border-gold)]"
                   />
                 </div>
               </div>
@@ -480,7 +725,7 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
               {/* Line items editor */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-serif font-bold text-[#D4AF37]">Menu Line Items</span>
+                  <span className="font-serif font-bold text-[var(--text-accent)]">Menu Line Items</span>
                   <button
                     type="button"
                     onClick={() =>
@@ -489,17 +734,21 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
                         { name: 'Gourmet Dish Line', portionLabel: 'Portions', priceNaira: '3500', quantity: 50 },
                       ])
                     }
-                    className="text-[11px] text-[#D4AF37] hover:underline flex items-center gap-1"
+                    className="min-h-[44px] px-3 rounded-lg text-sm text-[var(--text-accent)] hover:underline inline-flex items-center gap-1 font-semibold"
                   >
-                    <Plus className="w-3 h-3" /> Add Item Line
+                    <Plus className="w-4 h-4" /> Add Item Line
                   </button>
                 </div>
 
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {revItems.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 bg-[#0B0A09] p-2 rounded border border-white/5">
+                    <div
+                      key={idx}
+                      className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-[var(--bg-surface-muted)] p-2.5 rounded-lg border border-[var(--border-subtle-card)]"
+                    >
                       <input
                         type="text"
+                        aria-label={`Line item ${idx + 1} dish name`}
                         placeholder="Dish Name"
                         value={item.name}
                         onChange={(e) => {
@@ -507,10 +756,11 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
                           updated[idx].name = e.target.value;
                           setRevItems(updated);
                         }}
-                        className="col-span-5 bg-[#17120F] border border-white/10 rounded px-2 py-1 text-xs"
+                        className="sm:col-span-5 min-h-[44px] bg-[var(--bg-card)] border border-[var(--border-card)] rounded px-2.5 py-1.5 text-sm text-[var(--text-primary)]"
                       />
                       <input
                         type="text"
+                        aria-label={`Line item ${idx + 1} portion`}
                         placeholder="Portion"
                         value={item.portionLabel}
                         onChange={(e) => {
@@ -518,10 +768,11 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
                           updated[idx].portionLabel = e.target.value;
                           setRevItems(updated);
                         }}
-                        className="col-span-3 bg-[#17120F] border border-white/10 rounded px-2 py-1 text-xs"
+                        className="sm:col-span-3 min-h-[44px] bg-[var(--bg-card)] border border-[var(--border-card)] rounded px-2.5 py-1.5 text-sm text-[var(--text-primary)]"
                       />
                       <input
                         type="text"
+                        aria-label={`Line item ${idx + 1} unit price Naira`}
                         placeholder="Unit ₦"
                         value={item.priceNaira}
                         onChange={(e) => {
@@ -529,10 +780,11 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
                           updated[idx].priceNaira = e.target.value;
                           setRevItems(updated);
                         }}
-                        className="col-span-2 bg-[#17120F] border border-white/10 rounded px-2 py-1 text-xs font-mono"
+                        className="sm:col-span-2 min-h-[44px] bg-[var(--bg-card)] border border-[var(--border-card)] rounded px-2.5 py-1.5 text-sm font-mono price-tabular text-[var(--text-primary)]"
                       />
                       <input
                         type="number"
+                        aria-label={`Line item ${idx + 1} quantity`}
                         min={1}
                         placeholder="Qty"
                         value={item.quantity}
@@ -541,7 +793,7 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
                           updated[idx].quantity = Number(e.target.value);
                           setRevItems(updated);
                         }}
-                        className="col-span-2 bg-[#17120F] border border-white/10 rounded px-2 py-1 text-xs font-mono"
+                        className="sm:col-span-2 min-h-[44px] bg-[var(--bg-card)] border border-[var(--border-card)] rounded px-2.5 py-1.5 text-sm font-mono price-tabular text-[var(--text-primary)]"
                       />
                     </div>
                   ))}
@@ -549,27 +801,30 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-white/70 mb-1">Revision Scope Notes (Printed on invoice)</label>
+                <label htmlFor="rev-scope-notes" className="block text-[var(--text-body-muted)] font-semibold mb-1">
+                  Revision Scope Notes (Printed on invoice)
+                </label>
                 <input
+                  id="rev-scope-notes"
                   type="text"
                   placeholder="e.g. Includes chafing equipment, live cooking chef, and standard service staff."
                   value={revNotes}
                   onChange={(e) => setRevNotes(e.target.value)}
-                  className="w-full bg-[#0B0A09] border border-white/10 rounded p-2 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg p-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-gold)]"
                 />
               </div>
 
-              <div className="pt-2 flex justify-end gap-2 border-t border-white/10">
+              <div className="pt-2 flex justify-end gap-2 border-t border-[var(--border-subtle-card)]">
                 <button
                   type="button"
                   onClick={() => setRevisionEvent(null)}
-                  className="px-4 py-2 rounded text-white/60 hover:text-white"
+                  className="min-h-[44px] px-4 py-2 rounded-xl text-sm border border-[var(--border-subtle-card)] text-[var(--text-body-muted)] hover:text-[var(--text-primary)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-luxury px-6 py-2 rounded-xl text-xs font-bold"
+                  className="btn-luxury px-6 py-2 rounded-xl text-sm font-bold"
                 >
                   Lock &amp; Save Revision {revisionEvent.quotes.length + 1}
                 </button>
@@ -581,45 +836,62 @@ export const StaffCateringManager: React.FC<StaffCateringManagerProps> = ({
 
       {/* Bulk Refund Advice Modal */}
       {refundPreview && (
-        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
-          <div className="bg-[#17120F] border border-[#D4AF37] rounded-xl max-w-md w-full p-6 text-[#F7EFD9] space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <h3 className="font-serif font-bold text-base text-[#F7EFD9]">Bulk Cancellation Advice</h3>
-              <button onClick={() => setRefundPreview(null)} className="text-white/60 hover:text-white">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bulk-refund-modal-title"
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4"
+        >
+          <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-xl max-w-md w-full p-6 text-[var(--text-primary)] space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle-card)]">
+              <h3 id="bulk-refund-modal-title" className="font-serif font-bold text-lg text-[var(--text-primary)]">
+                Bulk Cancellation Advice
+              </h3>
+              <button
+                type="button"
+                aria-label="Close Bulk Cancellation modal"
+                onClick={() => setRefundPreview(null)}
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg text-[var(--text-body-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-white/80 leading-relaxed">
+            <p className="text-sm text-[var(--text-body-muted)] leading-relaxed">
               Based on Section 17.7 (Master PRD v2 Addendum) for event on{' '}
-              <span className="font-bold text-[#D4AF37]">{refundPreview.event.eventDate}</span>:
+              <span className="font-bold text-[var(--text-accent)]">{refundPreview.event.eventDate}</span>:
             </p>
 
-            <div className="bg-[#0B0A09] p-3 rounded-lg border border-white/5 space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between text-white/70">
+            <div className="bg-[var(--bg-surface-muted)] p-4 rounded-xl border border-[var(--border-subtle-card)] space-y-2 text-sm font-mono price-tabular">
+              <div className="flex justify-between text-[var(--text-body-muted)]">
                 <span>Notice Duration:</span>
-                <span className="text-[#F7EFD9] font-bold">{refundPreview.calc.noticeHours} Hours</span>
+                <span className="text-[var(--text-primary)] font-bold">
+                  {refundPreview.calc.noticeHours} Hours
+                </span>
               </div>
-              <div className="flex justify-between text-white/70">
+              <div className="flex justify-between text-[var(--text-body-muted)]">
                 <span>Refund Tier:</span>
-                <span className="text-emerald-400 font-bold">{refundPreview.calc.refundBps / 100}% of Food</span>
+                <span className="text-[var(--text-money-positive)] font-bold">
+                  {refundPreview.calc.refundBps / 100}% of Food
+                </span>
               </div>
-              <div className="flex justify-between text-white/70">
+              <div className="flex justify-between text-[var(--text-body-muted)]">
                 <span>Eligible Food Refund:</span>
-                <span className="text-emerald-400 font-bold">
+                <span className="text-[var(--text-money-positive)] font-bold">
                   {formatNaira(refundPreview.calc.eligibleFoodRefundKobo)}
                 </span>
               </div>
             </div>
 
-            <p className="text-[11px] text-white/60 italic leading-snug">
+            <p className="text-sm text-[var(--text-body-muted)] italic leading-snug">
               {refundPreview.calc.reason}
             </p>
 
             <div className="flex justify-end pt-2">
               <button
+                type="button"
                 onClick={() => setRefundPreview(null)}
-                className="btn-luxury px-4 py-1.5 rounded-lg text-xs font-bold"
+                className="btn-luxury px-5 py-2 rounded-xl text-sm font-bold"
               >
                 Close
               </button>

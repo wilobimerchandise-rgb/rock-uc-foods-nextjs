@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { orderRepository } from '../../../../src/order/orderRepository';
+import {
+  getBusinessBankSettings,
+  hasVerifiedBankSettings,
+  MISSING_BANK_DETAILS_CHECKOUT_MESSAGE,
+} from '../../../../src/lib/businessSettings';
+import { authorizeOrderAccess, serializeOrderForApi } from '../../../../src/order/orderAuth';
 
-function serializeOrder(order: any) {
-  return {
-    ...order,
-    deliveryFeeKobo: order.deliveryFeeKobo.toString(),
-    subtotalKobo: order.subtotalKobo.toString(),
-    totalKobo: order.totalKobo.toString(),
-    discountKobo: order.discountKobo ? order.discountKobo.toString() : undefined,
-    items: order.items.map((i: any) => ({
-      ...i,
-      unitPriceKoboSnapshot: i.unitPriceKoboSnapshot.toString(),
-      totalKoboSnapshot: i.totalKoboSnapshot.toString(),
-      selectedOptionsSnapshot: (i.selectedOptionsSnapshot || []).map((o: any) => ({
-        ...o,
-        priceDeltaKobo: o.priceDeltaKobo ? o.priceDeltaKobo.toString() : '0',
-      })),
-    })),
-  };
-}
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   req: NextRequest,
@@ -29,10 +17,34 @@ export async function GET(
     return NextResponse.json({ error: 'Order code is required' }, { status: 400 });
   }
 
-  const order = orderRepository.getByCode(code);
-  if (!order) {
-    return NextResponse.json({ error: `Order '${code}' not found` }, { status: 404 });
+  const auth = await authorizeOrderAccess(req, code);
+  if (!auth.authorized) {
+    return NextResponse.json(
+      { error: auth.error },
+      { status: auth.status, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
-  return NextResponse.json({ order: serializeOrder(order) });
+  const bankSettings = getBusinessBankSettings();
+  const configured = hasVerifiedBankSettings(bankSettings);
+
+  return NextResponse.json(
+    {
+      order: serializeOrderForApi(auth.order, {
+        isAdmin: auth.isAdmin,
+        role: auth.adminProfile?.role,
+        hasMfaVerified: auth.adminProfile?.hasMfaVerified,
+      }),
+      bankDetails:
+        configured && bankSettings
+          ? {
+              bankName: bankSettings.bankName,
+              accountName: bankSettings.accountName,
+              accountNumber: bankSettings.accountNumber,
+            }
+          : null,
+      bankMessage: configured ? null : MISSING_BANK_DETAILS_CHECKOUT_MESSAGE,
+    },
+    { status: 200, headers: { 'Cache-Control': 'no-store' } }
+  );
 }

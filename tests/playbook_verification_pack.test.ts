@@ -212,6 +212,7 @@ describe('Playbook v2 Section 14: Golden Fixtures & Verification Pack', () => {
         status: 'payment_confirmed',
         policyVersion: 'v2',
         policyAcceptedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         items: [
@@ -293,6 +294,7 @@ describe('Playbook v2 Section 14: Golden Fixtures & Verification Pack', () => {
         status: 'payment_confirmed',
         policyVersion: 'v2',
         policyAcceptedAt: lagosIso,
+        expiresAt: new Date(new Date(lagosIso).getTime() + 7 * 3600 * 1000).toISOString(),
         createdAt: lagosIso,
         updatedAt: lagosIso,
         items: [],
@@ -317,7 +319,7 @@ describe('Playbook v2 Section 14: Golden Fixtures & Verification Pack', () => {
       const m4 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0004_events_and_invoices.sql'), 'utf-8');
       const m5 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0005_invoices_and_receipts.sql'), 'utf-8');
       const m6 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0006_payments_and_reconciliation.sql'), 'utf-8');
-      const m7 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0007_promotions_and_reports.sql'), 'utf-8');
+      const m7 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0021_promotions_and_reports.sql'), 'utf-8');
       const m8 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0008_kds_and_dispatch.sql'), 'utf-8');
       const m9 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0009_playbook_v2_alignment.sql'), 'utf-8');
 

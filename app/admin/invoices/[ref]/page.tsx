@@ -1,9 +1,14 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import { privateMetadata } from '@/src/seo/metadata';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
+import {
+  getProfileFromService,
+  resolveSessionFromRequest,
+  hasSessionVerifiedMfa,
+} from '@/src/auth/wiring';
 import { invoiceRepository, estimateRepository, invoiceLinksRepository, invoiceVersionsRepository } from '@/src/invoices/repository';
 import { formatNaira } from '@/src/lib/money';
+import { maskCustomerPhone } from '@/src/lib/security';
 import { getEstimatorConfig } from '@/src/estimator/config';
 import { AdminInvoiceDetailClient } from '@/src/components/admin/AdminInvoiceDetailClient';
 
@@ -18,10 +23,11 @@ export default async function AdminInvoiceDetailPage({
   const { ref } = await params;
 
   // 1. Fetch user session
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest();
   const user = sessionRes.session?.user;
   const profile = user ? await getProfileFromService(user.id) : null;
   const userRole = profile?.role || 'staff';
+  const hasMfaVerified = hasSessionVerifiedMfa(sessionRes.session, profile?.hasMfaVerified);
 
   // 2. Fetch invoice from database
   const invoice = invoiceRepository.getByPublicRef(ref);
@@ -40,7 +46,7 @@ export default async function AdminInvoiceDetailPage({
     revision: invoice.revision,
     status: invoice.status,
     customerName: estimate?.contactName || 'Valued Client',
-    customerPhone: estimate?.contactPhone || '',
+    customerPhone: maskCustomerPhone(estimate?.contactPhone || '', userRole, hasMfaVerified),
     customerEmail: estimate?.contactEmail,
     packageId: estimate?.inputs?.packageId || 'tier-bronze',
     guests: estimate?.inputs?.guests || 0,
@@ -91,5 +97,12 @@ export default async function AdminInvoiceDetailPage({
     zones: [],
   };
 
-  return <AdminInvoiceDetailClient invoice={serializedInvoice} userRole={userRole} config={serializedConfig} />;
+  return (
+    <AdminInvoiceDetailClient
+      invoice={serializedInvoice}
+      userRole={userRole}
+      hasMfaVerified={hasMfaVerified}
+      config={serializedConfig}
+    />
+  );
 }

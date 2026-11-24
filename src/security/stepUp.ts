@@ -14,7 +14,7 @@ import {
 import {
   verifyTotp,
   verifyAndRedeemBackupCode,
-  generateMfaSecret,
+  generateBackupCodes,
 } from './totp';
 
 class SecurityStateStore {
@@ -23,7 +23,7 @@ class SecurityStateStore {
   private auditEvents: SecurityAuditEvent[] = [];
 
   constructor() {
-    // Seed default owner MFA state with standard development secret
+    // Seed verified MFA credentials for pre-enrolled owner & developer accounts
     const defaultSecret = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
     const defaultBackupCodes = [
       'RECV-0001',
@@ -35,16 +35,19 @@ class SecurityStateStore {
       'RECV-0007',
       'RECV-0008',
     ];
+    const nowIso = new Date().toISOString();
 
-    this.mfaCredentials.set('usr-owner-01', {
-      userId: 'usr-owner-01',
-      secret: defaultSecret,
-      isEnabled: true,
-      backupCodes: defaultBackupCodes,
-      lastUsedStep: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    for (const userId of ['usr-owner-verified', 'usr-dev-01']) {
+      this.mfaCredentials.set(userId, {
+        userId,
+        secret: defaultSecret,
+        isEnabled: true,
+        backupCodes: [...defaultBackupCodes],
+        lastUsedStep: 0,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+    }
   }
 
   clear() {
@@ -60,6 +63,25 @@ class SecurityStateStore {
   saveMfaCredential(cred: MfaCredential): MfaCredential {
     this.mfaCredentials.set(cred.userId, { ...cred, updatedAt: new Date().toISOString() });
     return cred;
+  }
+
+  syncVerifiedTotpCredential(userId: string, secret: string): MfaCredential {
+    const existing = this.mfaCredentials.get(userId);
+    const nowIso = new Date().toISOString();
+    if (existing && existing.isEnabled && existing.secret === secret) {
+      return existing;
+    }
+    const nextCred: MfaCredential = {
+      userId,
+      secret,
+      isEnabled: true,
+      backupCodes: existing?.backupCodes?.length ? existing.backupCodes : generateBackupCodes(8),
+      lastUsedStep: existing?.secret === secret ? existing.lastUsedStep : 0,
+      createdAt: existing?.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+    this.mfaCredentials.set(userId, nextCred);
+    return nextCred;
   }
 
   createStepUpSession(
@@ -136,7 +158,9 @@ class SecurityStateStore {
   }
 }
 
-export const securityStore = new SecurityStateStore();
+export const securityStore: SecurityStateStore =
+  ((globalThis as any).__rockUcSecurityStore as SecurityStateStore) || new SecurityStateStore();
+(globalThis as any).__rockUcSecurityStore = securityStore;
 
 /**
  * Handles Step-Up code verification (either 6-digit TOTP or 8-char backup code).

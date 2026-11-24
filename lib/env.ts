@@ -3,7 +3,7 @@
  * Playbook v2 Section 3, 10 & 16.C
  * 
  * Enforces strict separation of client vs server secrets.
- * Server keys (SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY, CRON_SECRET)
+ * Server keys (SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET)
  * must NEVER be exposed with NEXT_PUBLIC_ prefixes.
  */
 
@@ -39,13 +39,9 @@ export const env = {
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  paystackPublicKey: process.env.PAYSTACK_PUBLIC_KEY || '',
-  featurePaystackEnabled: process.env.FEATURE_PAYSTACK_ENABLED === 'true',
-  featureManualPaymentsEnabled: process.env.FEATURE_MANUAL_PAYMENTS_ENABLED === 'true',
 
   // Server Only
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-  paystackSecretKey: process.env.PAYSTACK_SECRET_KEY || '',
   cronSecret: process.env.CRON_SECRET || '',
   orderAlertEmails: (process.env.ORDER_ALERT_EMAILS || 'rock-uc-foods@gmail.com,estherkwentua@gmail.com').split(','),
   emailProviderApiKey: process.env.EMAIL_PROVIDER_API_KEY || '',
@@ -64,8 +60,6 @@ export function auditEnvironmentVariables(): EnvAuditResult[] {
     { key: 'NEXT_PUBLIC_SUPABASE_URL', serverOnly: false, expectedPrefix: 'http' },
     { key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', serverOnly: false, expectedPrefix: 'eyJ' },
     { key: 'SUPABASE_SERVICE_ROLE_KEY', serverOnly: true, expectedPrefix: 'eyJ' },
-    { key: 'PAYSTACK_PUBLIC_KEY', serverOnly: false, expectedPrefix: 'pk_' },
-    { key: 'PAYSTACK_SECRET_KEY', serverOnly: true, expectedPrefix: 'sk_' },
     { key: 'CRON_SECRET', serverOnly: true, expectedPrefix: null },
     { key: 'DOCUMENT_LINK_TTL_HOUR', serverOnly: true, expectedPrefix: null },
     { key: 'DOCUMENT_LINK_TTL_HOURS', serverOnly: true, expectedPrefix: null },

@@ -8,6 +8,8 @@
  */
 
 export const SESSION_COOKIE_NAME = 'sb-ruc-auth-token';
+export const REMEMBER_COOKIE_NAME = 'ruc_remember';
+export const REMEMBER_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days (Playbook §28.5)
 
 export interface CookieOptions {
   name: string;
@@ -19,7 +21,27 @@ export interface CookieOptions {
   maxAge?: number;
 }
 
-export function getSessionCookieOptions(value: string, maxAgeSeconds = 60 * 60 * 24 * 7): CookieOptions {
+export function authCookieOptions(remember: boolean) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    ...(remember ? { maxAge: REMEMBER_MAX_AGE_SECONDS } : {}),
+  };
+}
+
+export function getSessionCookieOptions(
+  value: string,
+  rememberOrMaxAge: boolean | number = false
+): CookieOptions {
+  const maxAge =
+    typeof rememberOrMaxAge === 'number'
+      ? rememberOrMaxAge
+      : rememberOrMaxAge
+      ? REMEMBER_MAX_AGE_SECONDS
+      : undefined;
+
   return {
     name: SESSION_COOKIE_NAME,
     value,
@@ -27,6 +49,14 @@ export function getSessionCookieOptions(value: string, maxAgeSeconds = 60 * 60 *
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: maxAgeSeconds,
+    ...(maxAge !== undefined ? { maxAge } : {}),
+  };
+}
+
+export function getRememberCookieOptions(remember: boolean): CookieOptions {
+  return {
+    name: REMEMBER_COOKIE_NAME,
+    value: remember ? '1' : '0',
+    ...authCookieOptions(remember),
   };
 }

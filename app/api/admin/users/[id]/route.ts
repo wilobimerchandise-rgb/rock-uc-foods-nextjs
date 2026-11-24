@@ -5,7 +5,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isSameOrigin } from '@/src/lib/same-origin';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '@/src/auth/wiring';
 import { UserProfile } from '@/src/lib/auth/access';
 import {
   updateStaffUser,
@@ -30,7 +34,7 @@ export async function PATCH(
   }
 
   // 2. Auth Session & Profile
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -47,9 +51,7 @@ export async function PATCH(
     );
   }
 
-  const hasVerifiedTotp =
-    (user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ?? false) ||
-    sessionRes.session?.aal === 'aal2';
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
 
   const actor: UserProfile = {
     id: profile.id,

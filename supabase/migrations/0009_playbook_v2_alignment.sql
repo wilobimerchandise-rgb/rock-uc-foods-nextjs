@@ -34,7 +34,7 @@ select
     invoice_id,
     payment_type,
     method,
-    case when method = 'manual_transfer' then 'manual' else 'paystack' end as provider,
+    'manual' as provider,
     provider_reference as provider_ref,
     amount_kobo,
     fee_kobo,

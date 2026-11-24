@@ -21,9 +21,10 @@ import { NotificationMessage } from '../../types/notification';
 
 interface NotificationHistoryProps {
   orderId: string;
+  orderToken?: string;
 }
 
-export function NotificationHistoryDrawer({ orderId }: NotificationHistoryProps) {
+export function NotificationHistoryDrawer({ orderId, orderToken }: NotificationHistoryProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,8 +32,16 @@ export function NotificationHistoryDrawer({ orderId }: NotificationHistoryProps)
   useEffect(() => {
     let ignore = false;
     if (isOpen && orderId) {
-      fetch(`/api/notifications?orderId=${encodeURIComponent(orderId)}`)
-        .then((res) => res.json())
+      const urlToken =
+        orderToken ||
+        (typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('token')?.trim() || ''
+          : '');
+      const query = `orderId=${encodeURIComponent(orderId)}${
+        urlToken ? `&token=${encodeURIComponent(urlToken)}` : ''
+      }`;
+      fetch(`/api/notifications?${query}`)
+        .then((res) => (res.ok ? res.json() : { notifications: [] }))
         .then((data) => {
           if (!ignore) {
             setNotifications(data.notifications || []);
@@ -46,50 +55,55 @@ export function NotificationHistoryDrawer({ orderId }: NotificationHistoryProps)
     return () => {
       ignore = true;
     };
-  }, [isOpen, orderId]);
+  }, [isOpen, orderId, orderToken]);
 
   return (
-    <div className="bg-[#17120F] border border-white/10 rounded-2xl overflow-hidden text-[#F7EFD9]">
+    <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl overflow-hidden text-[var(--text-primary)]">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
+        onClick={() => {
+          const nextOpen = !isOpen;
+          if (nextOpen && orderId) setLoading(true);
+          setIsOpen(nextOpen);
+        }}
+        aria-expanded={isOpen}
+        className="w-full min-h-[44px] p-4 flex items-center justify-between hover:bg-[var(--bg-surface-muted)] transition-colors text-left focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
       >
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center shrink-0">
-            <Bell className="w-4 h-4 text-[#D4AF37]" />
+          <div className="w-9 h-9 rounded-lg bg-[var(--cta-wine-bg)] border border-[var(--border-gold)] flex items-center justify-center shrink-0">
+            <Bell className="w-4 h-4 text-[var(--gold-light)]" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-white flex items-center gap-2">
+            <h4 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2 flex-wrap">
               <span>Automated WhatsApp &amp; SMS Alerts</span>
               {notifications.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-[#D4AF37]/20 text-[#D4AF37] rounded-full text-[10px]">
+                <span className="px-2 py-0.5 bg-[var(--status-neutral-bg)] border border-[var(--status-neutral-border)] text-[var(--status-neutral-text)] rounded-md text-sm font-semibold price-tabular">
                   {notifications.length}
                 </span>
               )}
             </h4>
-            <p className="text-[10px] text-stone-400">
+            <p className="text-sm text-[var(--text-body-muted)]">
               Live outbox records dispatched for this order.
             </p>
           </div>
         </div>
 
         {isOpen ? (
-          <ChevronUp className="w-4 h-4 text-stone-400" />
+          <ChevronUp className="w-5 h-5 text-[var(--text-body-muted)] shrink-0" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-stone-400" />
+          <ChevronDown className="w-5 h-5 text-[var(--text-body-muted)] shrink-0" />
         )}
       </button>
 
       {isOpen && (
-        <div className="p-4 pt-0 border-t border-white/5 space-y-3">
+        <div className="p-4 pt-3 border-t border-[var(--border-subtle-card)] space-y-3">
           {loading ? (
-            <div className="py-4 text-center text-xs text-stone-400 flex items-center justify-center space-x-2">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#D4AF37]" />
+            <div className="py-4 text-center text-sm text-[var(--text-body-muted)] flex items-center justify-center space-x-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-[var(--text-accent)]" />
               <span>Fetching notification history...</span>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="py-4 text-center text-xs text-stone-400">
+            <div className="py-4 text-center text-sm text-[var(--text-body-muted)]">
               No notifications dispatched yet for this order.
             </div>
           ) : (
@@ -97,24 +111,24 @@ export function NotificationHistoryDrawer({ orderId }: NotificationHistoryProps)
               {notifications.map((n) => (
                 <div
                   key={n.id}
-                  className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-2 text-xs"
+                  className="p-3 bg-[var(--bg-surface-muted)] border border-[var(--border-subtle-card)] rounded-xl space-y-2 text-sm"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-[var(--text-accent)]">
                       {n.channel === 'whatsapp' ? (
                         <>
-                          <MessageSquare className="w-3 h-3 text-emerald-400" /> WhatsApp
+                          <MessageSquare className="w-4 h-4 text-[var(--status-success-text)]" /> WhatsApp
                         </>
                       ) : (
                         <>
-                          <Smartphone className="w-3 h-3 text-sky-400" /> SMS
+                          <Smartphone className="w-4 h-4 text-[var(--status-info-text)]" /> SMS
                         </>
                       )}
-                      <span>• {n.eventType.replace(/_/g, ' ')}</span>
+                      <span>&bull; {n.eventType.replace(/_/g, ' ')}</span>
                     </span>
 
-                    <span className="text-[10px] text-stone-500 flex items-center gap-1 font-mono">
-                      <Clock className="w-2.5 h-2.5" />
+                    <span className="text-sm text-[var(--text-body-muted)] flex items-center gap-1 font-mono price-tabular">
+                      <Clock className="w-3.5 h-3.5" />
                       {new Date(n.createdAt).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
@@ -122,7 +136,7 @@ export function NotificationHistoryDrawer({ orderId }: NotificationHistoryProps)
                     </span>
                   </div>
 
-                  <p className="text-stone-300 font-sans text-[11px] leading-relaxed whitespace-pre-line">
+                  <p className="text-[var(--text-primary)] font-sans text-sm leading-relaxed whitespace-pre-line">
                     {n.message}
                   </p>
 
@@ -132,11 +146,11 @@ export function NotificationHistoryDrawer({ orderId }: NotificationHistoryProps)
                         href={n.whatsAppUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 transition-colors"
+                        className="min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold bg-[var(--status-success-bg)] hover:opacity-90 text-[var(--status-success-text)] border border-[var(--status-success-border)] transition-opacity"
                       >
-                        <MessageSquare className="w-3 h-3" />
+                        <MessageSquare className="w-4 h-4 shrink-0" />
                         <span>Open in WhatsApp</span>
-                        <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-60" />
+                        <ExternalLink className="w-3.5 h-3.5 ml-0.5 shrink-0" />
                       </a>
                     </div>
                   )}

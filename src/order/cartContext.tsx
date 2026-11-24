@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { menuRepository } from '../menu/data';
 import { getOrderablePrice } from '../menu/pricing';
 
@@ -62,21 +62,29 @@ function makeCartKey(menuItemId: string, selectedTierId?: string, selectedOption
 }
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [entries, setEntries] = useState<StoredCartEntry[]>(() => {
+  const [entries, setEntries] = useState<StoredCartEntry[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const hasHydratedRef = useRef(false);
+
+  useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         const raw = window.localStorage.getItem(CART_STORAGE_KEY_V2);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setEntries(parsed);
+          }
+        }
       } catch {
-        // fallback to empty
+        // ignore corrupted storage
       }
     }
-    return [];
-  });
-
-  const [isCartOpen, setIsCartOpen] = useState(false);
+    hasHydratedRef.current = true;
+  }, []);
 
   useEffect(() => {
+    if (!hasHydratedRef.current) return;
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         window.localStorage.setItem(CART_STORAGE_KEY_V2, JSON.stringify(entries));

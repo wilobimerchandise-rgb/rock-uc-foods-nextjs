@@ -84,3 +84,46 @@ export function sanitizeErrorMessage(error: unknown): string {
   }
   return 'An internal service error occurred. Please contact customer support via WhatsApp.';
 }
+
+/**
+ * Section 31.3 Finding 9:
+ * Only MFA-verified Owner or Developer sessions may inspect full unmasked customer phone numbers.
+ * Staff accounts and any session without second-factor verification see masked digits only.
+ */
+export function canViewUnmaskedCustomerPhone(
+  role?: string | null,
+  hasMfaVerified?: boolean
+): boolean {
+  if (!hasMfaVerified) return false;
+  return role === 'owner' || role === 'developer';
+}
+
+export function maskCustomerPhone(
+  phone: string | null | undefined,
+  role?: string | null,
+  hasMfaVerified?: boolean
+): string {
+  if (!phone || typeof phone !== 'string') return '';
+  const trimmed = phone.trim();
+  if (!trimmed) return '';
+
+  if (canViewUnmaskedCustomerPhone(role, hasMfaVerified)) {
+    return trimmed;
+  }
+
+  // Preserve already-redacted markers
+  if (trimmed.startsWith('[REDACTED')) {
+    return trimmed;
+  }
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 4) {
+    return '****';
+  }
+  const last4 = digits.slice(-4);
+  if (digits.startsWith('234') || trimmed.startsWith('+234')) {
+    return `+234 *** *** ${last4}`;
+  }
+  return `*** *** ${last4}`;
+}
+

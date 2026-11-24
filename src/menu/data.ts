@@ -417,11 +417,13 @@ class MenuRepository {
       existing.status = status;
       existing.isFeatured = itemInput.isFeatured ?? existing.isFeatured;
       existing.isFreeItem = isFree;
+      if (itemInput.imagePath !== undefined) existing.imagePath = itemInput.imagePath;
+      if (itemInput.imageAlt !== undefined) existing.imageAlt = itemInput.imageAlt;
       if (itemInput.showHeat !== undefined) existing.showHeat = itemInput.showHeat;
       if (itemInput.availabilityNote !== undefined) existing.availabilityNote = itemInput.availabilityNote;
       if (itemInput.photoUrl !== undefined) existing.photoUrl = itemInput.photoUrl;
       if (itemInput.sizeTiers !== undefined) existing.sizeTiers = itemInput.sizeTiers;
-      if (itemInput.optionGroups) existing.optionGroups = itemInput.optionGroups;
+      if (itemInput.optionGroups !== undefined) existing.optionGroups = itemInput.optionGroups;
       existing.version += 1;
       existing.updatedBy = actorId;
       existing.updatedAt = new Date().toISOString();
@@ -463,6 +465,12 @@ class MenuRepository {
     item.allergens = [...snap.allergens];
     item.status = snap.status;
     item.isFeatured = snap.isFeatured;
+    item.imagePath = snap.imagePath;
+    item.imageAlt = snap.imageAlt;
+    item.photoUrl = snap.photoUrl;
+    item.showHeat = snap.showHeat;
+    item.availabilityNote = snap.availabilityNote;
+    item.sizeTiers = snap.sizeTiers ? snap.sizeTiers.map((t) => ({ ...t })) : undefined;
     item.version += 1;
     item.updatedBy = actorId;
     item.updatedAt = new Date().toISOString();

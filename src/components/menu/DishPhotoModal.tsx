@@ -6,16 +6,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * ROCK UC FOODS - Phase 2B Native Accessible Photo Viewer
- * Playbook v9 Section 26.1 Item 5
- *
- * Rules:
- * - Native <dialog> element with showModal().
- * - Accessible name with aria-labelledby="dish-viewer-title".
- * - Page scrolling locked while open.
- * - Focus returns to trigger element on close.
- * - Escape key, Close button, and backdrop click close modal.
- * - Previous / Next buttons wrap from last dish to first and vice versa.
- * - Touch swipe: horizontal swipe > 50px changes dish; <= 50px does not navigate.
+ * Playbook v9 Section 26.1 Item 5 & Section 35
  */
 
 export interface DishPhotoModalProps {
@@ -47,7 +38,6 @@ export function DishPhotoModal({
   const touchStartXRef = useRef<number | null>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
 
-  // Store trigger for focus restore
   useEffect(() => {
     if (triggerElement) {
       lastTriggerRef.current = triggerElement;
@@ -69,7 +59,6 @@ export function DishPhotoModal({
     onNavigate(allDishes[nextIdx]);
   }, [currentIndex, total, allDishes, onNavigate]);
 
-  // Handle open/close with showModal & body scroll lock
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -94,7 +83,6 @@ export function DishPhotoModal({
     };
   }, [isOpen, activeDish]);
 
-  // Escape key handler
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDialogElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -108,14 +96,12 @@ export function DishPhotoModal({
     }
   };
 
-  // Click outside backdrop
   const handleDialogClick = (e: React.MouseEvent<HTMLDialogElement>) => {
     if (e.target === dialogRef.current) {
       onClose();
     }
   };
 
-  // Touch Swipe Handlers (> 50px threshold)
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0].clientX;
   };
@@ -127,13 +113,10 @@ export function DishPhotoModal({
     touchStartXRef.current = null;
 
     if (deltaX > 50) {
-      // Swiped right -> go to previous
       handlePrev();
     } else if (deltaX < -50) {
-      // Swiped left -> go to next
       handleNext();
     }
-    // <= 50 px does nothing
   };
 
   if (!isOpen || !activeDish) {
@@ -159,28 +142,29 @@ export function DishPhotoModal({
       data-testid="dish-photo-modal"
       className="backdrop:bg-black/85 bg-transparent p-4 sm:p-6 max-w-lg w-full fixed inset-0 m-auto focus:outline-none z-50 overflow-visible"
     >
-      <div className="bg-[#17120F] border border-[#D4AF37]/50 rounded-2xl p-5 sm:p-6 text-[#F7EFD9] shadow-2xl relative space-y-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl p-5 sm:p-6 text-[var(--text-primary)] shadow-2xl relative space-y-4">
         {/* Top Header Controls: Counter & Close */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
-          <span className="text-xs font-semibold text-[#D4AF37] tracking-wider uppercase">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border-card)] pb-3">
+          <span className="text-sm font-semibold text-[var(--text-accent)] tracking-wider uppercase">
             Dish {currentIndex + 1} of {total}
           </span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close photo viewer"
-            className="p-1.5 rounded-lg bg-[#0B0A09] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-[#F7EFD9] focus:outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all cursor-pointer"
+            className="min-w-[44px] min-h-[44px] rounded-lg bg-[var(--bg-surface-muted)] border border-[var(--border-gold)] hover:opacity-90 text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] flex items-center justify-center transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Enlarged Photo or Tinted Monogram Tile */}
-        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-[#0B0A09] border border-[#D4AF37]/30 flex items-center justify-center">
+        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-[#17120F] border border-[var(--border-card)] flex items-center justify-center">
           {activeDish.photoUrl ? (
             <img
               src={activeDish.photoUrl}
               alt={`Enlarged view of ${activeDish.name}`}
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
             />
           ) : (
@@ -188,20 +172,20 @@ export function DishPhotoModal({
               <span className="font-serif font-bold text-6xl tracking-widest text-[#D4AF37]">
                 {monogram}
               </span>
-              <span className="text-xs uppercase tracking-widest text-[#F7EFD9]/60 mt-2 font-medium">
+              <span className="text-sm uppercase tracking-widest text-[#F7EFD9] mt-2 font-medium">
                 Photo Coming Soon
               </span>
             </div>
           )}
 
-          {/* Navigation Arrows (Desktop / Tablet) */}
+          {/* Navigation Arrows */}
           {total > 1 && (
             <>
               <button
                 type="button"
                 onClick={handlePrev}
                 aria-label="Previous dish"
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-[#0B0A09]/80 border border-[#D4AF37]/40 text-[#F7EFD9] hover:bg-[#6B1230] focus:outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all cursor-pointer shadow-md"
+                className="min-w-[44px] min-h-[44px] absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-[#17120F]/90 border border-[#D4AF37] text-[#F7EFD9] hover:bg-[#6B1230] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] flex items-center justify-center transition-all cursor-pointer shadow-md"
               >
                 <ChevronLeft className="w-5 h-5 text-[#D4AF37]" />
               </button>
@@ -209,7 +193,7 @@ export function DishPhotoModal({
                 type="button"
                 onClick={handleNext}
                 aria-label="Next dish"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-[#0B0A09]/80 border border-[#D4AF37]/40 text-[#F7EFD9] hover:bg-[#6B1230] focus:outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all cursor-pointer shadow-md"
+                className="min-w-[44px] min-h-[44px] absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-[#17120F]/90 border border-[#D4AF37] text-[#F7EFD9] hover:bg-[#6B1230] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] flex items-center justify-center transition-all cursor-pointer shadow-md"
               >
                 <ChevronRight className="w-5 h-5 text-[#D4AF37]" />
               </button>
@@ -222,47 +206,47 @@ export function DishPhotoModal({
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <h2
               id="dish-viewer-title"
-              className="font-serif text-xl sm:text-2xl font-bold text-[#F7EFD9] tracking-tight"
+              className="font-serif text-xl sm:text-2xl font-bold text-[var(--text-primary)] tracking-tight"
             >
               {activeDish.name}
             </h2>
             {displayPrice && (
-              <span className="font-sans font-bold text-lg text-[#D4AF37] shrink-0 whitespace-nowrap">
+              <span className="font-sans price-tabular font-bold text-lg text-[var(--text-accent)] shrink-0 whitespace-nowrap">
                 {displayPrice}
               </span>
             )}
           </div>
 
           {activeDish.description && (
-            <p className="uppercase text-xs tracking-wider text-[#D4AF37]/90 leading-relaxed font-medium">
+            <p className="uppercase text-sm tracking-wide text-[var(--text-accent)] leading-relaxed font-medium">
               {activeDish.description}
             </p>
           )}
 
           {activeDish.availabilityNote && (
-            <p className="text-xs text-[#F7EFD9]/70 italic">
+            <p className="text-sm text-[var(--text-body-muted)] italic">
               {activeDish.availabilityNote}
             </p>
           )}
         </div>
 
         {/* Bottom Nav Buttons for Mobile Accessibility */}
-        <div className="flex items-center justify-between gap-3 pt-2 border-t border-white/10 sm:hidden">
+        <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-card)] sm:hidden">
           <button
             type="button"
             onClick={handlePrev}
-            className="flex-1 py-2 px-3 rounded-lg bg-[#0B0A09] border border-[#D4AF37]/30 text-xs font-semibold text-[#F7EFD9] flex items-center justify-center gap-1.5"
+            className="flex-1 min-h-[44px] py-2.5 px-3 rounded-lg bg-[var(--bg-surface-muted)] border border-[var(--border-gold)] text-sm font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <ChevronLeft className="w-4 h-4 text-[#D4AF37]" />
+            <ChevronLeft className="w-4 h-4 text-[var(--icon-on-surface)]" />
             <span>Previous</span>
           </button>
           <button
             type="button"
             onClick={handleNext}
-            className="flex-1 py-2 px-3 rounded-lg bg-[#0B0A09] border border-[#D4AF37]/30 text-xs font-semibold text-[#F7EFD9] flex items-center justify-center gap-1.5"
+            className="flex-1 min-h-[44px] py-2.5 px-3 rounded-lg bg-[var(--bg-surface-muted)] border border-[var(--border-gold)] text-sm font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span>Next</span>
-            <ChevronRight className="w-4 h-4 text-[#D4AF37]" />
+            <ChevronRight className="w-4 h-4 text-[var(--icon-on-surface)]" />
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 {
   "name": "ROCK UC FOODS",
-  "description": "Authentic Nigerian culinary & event catering platform with real-time KDS, dispatch tracking, bank reconciliation, and Paystack integration.",
+  "description": "Authentic Nigerian culinary & event catering platform with real-time KDS, dispatch tracking, and manual Nigerian bank transfer reconciliation.",
   "capabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ],

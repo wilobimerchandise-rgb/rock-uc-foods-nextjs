@@ -51,11 +51,12 @@ function createTestOrder(overrides: Partial<Order> = {}): Order {
     totalKobo: 700000n,
     policyVersion: 'v2',
     policyAcceptedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
     createdAt: '2026-10-21T12:00:00.000Z',
     updatedAt: '2026-10-21T12:00:00.000Z',
     items: [],
     ...overrides,
-  };
+  } as Order;
 }
 
 function createTestItem(overrides: Partial<OrderItemSnapshot> = {}): OrderItemSnapshot {
@@ -88,7 +89,7 @@ describe('Phase 8: KDS, Dispatch, Real-Time Delivery Tracking & Customer Notific
     const sql4 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0004_events_and_invoices.sql'), 'utf-8');
     const sql5 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0005_invoices_and_receipts.sql'), 'utf-8');
     const sql6 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0006_payments_and_reconciliation.sql'), 'utf-8');
-    const sql7 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0007_promotions_and_reports.sql'), 'utf-8');
+    const sql7 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0021_promotions_and_reports.sql'), 'utf-8');
     const sql8 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0008_kds_and_dispatch.sql'), 'utf-8');
 
     await db.exec(sql1);

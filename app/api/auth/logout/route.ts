@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAuthRouteRequest, authJson } from '@/src/auth/route-helper';
 import { logout, AuthError } from '@/src/auth/login-core';
-import { createLoginDeps } from '@/src/auth/wiring';
-import { SESSION_COOKIE_NAME } from '@/src/auth/cookies';
+import { createCookieLoginDeps } from '@/src/auth/wiring';
+import { SESSION_COOKIE_NAME, REMEMBER_COOKIE_NAME } from '@/src/auth/cookies';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,14 +13,22 @@ export async function POST(request: NextRequest) {
   }
 
   const { ipHash } = validation;
-  const deps = createLoginDeps(ipHash);
+  const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value || null;
+  const deps = createCookieLoginDeps(ipHash, sessionToken);
 
   try {
     const result = await logout(deps);
     const response = authJson(result);
 
-    // Delete session cookie
+    // Delete session and remember-me cookies
     response.cookies.set(SESSION_COOKIE_NAME, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 0,
+    });
+    response.cookies.set(REMEMBER_COOKIE_NAME, '', {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAuthRouteRequest, authJson } from '@/src/auth/route-helper';
 import { mfaStart, AuthError } from '@/src/auth/login-core';
-import { createLoginDeps } from '@/src/auth/wiring';
+import { createCookieLoginDeps } from '@/src/auth/wiring';
+import { SESSION_COOKIE_NAME } from '@/src/auth/cookies';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,8 @@ export async function POST(request: NextRequest) {
   }
 
   const { ipHash } = validation;
-  const deps = createLoginDeps(ipHash);
+  const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value || null;
+  const deps = createCookieLoginDeps(ipHash, sessionToken);
 
   try {
     const result = await mfaStart(deps);

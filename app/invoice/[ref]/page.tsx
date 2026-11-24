@@ -4,6 +4,7 @@ import { privateMetadata } from '@/src/seo/metadata';
 import { invoiceRepository, estimateRepository, invoiceLinksRepository } from '@/src/invoices/repository';
 import { isInvoiceAuthorizedByLinks } from '@/src/invoices/publicRef';
 import { formatNaira } from '@/src/lib/money';
+import { getBusinessBankSettings, hasVerifiedBankSettings } from '@/src/lib/businessSettings';
 import { CustomerInvoiceView } from '@/src/components/invoices/CustomerInvoiceView';
 
 export const metadata = privateMetadata;
@@ -46,6 +47,16 @@ export default async function CustomerInvoicePage({
     `Hello Chef Esther, I have paid the deposit for invoice ${invoice.publicRef}. Please find my payment receipt attached.`
   )}`;
 
+  const bankSettings = getBusinessBankSettings();
+  const verifiedBankDetails =
+    bankSettings && hasVerifiedBankSettings(bankSettings)
+      ? {
+          bankName: bankSettings.bankName,
+          accountName: bankSettings.accountName,
+          accountNumber: bankSettings.accountNumber,
+        }
+      : null;
+
   return (
     <CustomerInvoiceView
       invoice={{
@@ -62,6 +73,7 @@ export default async function CustomerInvoicePage({
         issuedAt: invoice.issuedAt,
         pdfDownloadUrl,
         whatsappProofUrl,
+        bankDetails: verifiedBankDetails,
       }}
     />
   );

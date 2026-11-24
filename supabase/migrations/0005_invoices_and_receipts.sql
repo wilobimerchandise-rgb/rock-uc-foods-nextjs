@@ -80,7 +80,7 @@ create table if not exists receipts (
     invoice_id uuid not null references invoices(id) on delete restrict,
     payment_id text not null,
     payment_date date not null,
-    payment_method text not null check (payment_method in ('manual_transfer', 'paystack', 'bank_deposit')),
+    payment_method text not null check (payment_method in ('manual_transfer', 'bank_deposit')),
     amount_received_kobo bigint not null check (amount_received_kobo > 0),
     invoice_total_kobo bigint not null check (invoice_total_kobo >= 0),
     paid_to_date_kobo bigint not null check (paid_to_date_kobo >= 0),

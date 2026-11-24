@@ -1,12 +1,12 @@
 /**
  * ROCK UC FOODS - Payment & Reconciliation Type Definitions
- * Playbook v2 Section 11 (Phase 6)
+ * Playbook v2 Section 11 & Manual GTBank Transfer Flow
  * All monetary amounts are strictly BigInt integer kobo.
  */
 
 export type PaymentType = 'order' | 'event_deposit' | 'event_balance';
-export type PaymentMethod = 'manual_transfer' | 'paystack';
-export type PaymentRecordStatus = 'pending_verification' | 'verified' | 'rejected' | 'refunded';
+export type PaymentMethod = 'manual_transfer';
+export type PaymentRecordStatus = 'pending_verification' | 'partial' | 'verified' | 'rejected' | 'refunded';
 
 export interface PaymentRecord {
   id: string;
@@ -16,21 +16,80 @@ export interface PaymentRecord {
   method: PaymentMethod;
   amountKobo: bigint;
   status: PaymentRecordStatus;
-  providerReference: string; // Paystack ref or customer bank transfer ref
+  providerReference: string; // Server-generated RUC-XXXXXX or customer bank transfer ref
   verifiedBy?: string;
+  verifiedByName?: string;
   verifiedAt?: string;
   proofImageUrl?: string;
+  receiptSha256?: string;
   rejectionReason?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
 }
 
-export interface WebhookEventRecord {
+export interface OrderPaymentProof {
   id: string;
-  eventType: string;
-  reference: string;
-  payload: Record<string, unknown>;
-  processedAt: string;
+  orderId: string;
+  orderCode: string;
+  paymentReference: string;
+  senderName: string;
+  transferTime: string;
+  receiptFileName?: string;
+  receiptMimeType?: 'image/jpeg' | 'image/png' | 'application/pdf';
+  receiptSizeBytes?: number;
+  receiptSha256?: string;
+  status: 'proof_submitted' | 'partial' | 'paid' | 'rejected';
+  submittedByIpHash?: string;
+  createdAt: string;
+}
+
+export interface SubmitOrderProofInput {
+  orderId?: string;
+  orderCode?: string;
+  senderName: string;
+  transferTime: string;
+  paymentReference?: string;
+  visitorIpHash?: string;
+  receiptFile?: {
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    buffer: Uint8Array;
+  };
+}
+
+export interface ConfirmOrderPaymentInput {
+  orderId: string;
+  actorUserId: string;
+  actorName?: string;
+  actorRole: 'owner' | 'staff' | 'developer' | 'customer' | string;
+  amountReceivedKobo: bigint;
+  paymentReference: string;
+  isBankAppCreditConfirmed: boolean;
+  notes?: string;
+  nowMs?: number;
+}
+
+export interface RecordPartialPaymentInput {
+  orderId: string;
+  actorUserId: string;
+  actorName?: string;
+  actorRole: 'owner' | 'staff' | 'developer' | 'customer' | string;
+  amountReceivedKobo: bigint;
+  paymentReference: string;
+  isBankAppCreditConfirmed: boolean;
+  notes?: string;
+  nowMs?: number;
+}
+
+export interface ReopenExpiredOrderInput {
+  orderId: string;
+  actorUserId: string;
+  actorName?: string;
+  actorRole: 'owner' | 'staff' | 'developer' | 'customer' | string;
+  reason: string;
+  extendHours?: number;
+  nowMs?: number;
 }
 
 export interface ManualPaymentSubmissionInput {
@@ -40,6 +99,7 @@ export interface ManualPaymentSubmissionInput {
   amountKobo: bigint;
   bankReference: string;
   proofImageUrl?: string;
+  receiptSha256?: string;
 }
 
 export interface ConfirmManualPaymentInput {
@@ -48,27 +108,6 @@ export interface ConfirmManualPaymentInput {
   actorRole: 'owner' | 'staff' | 'developer';
   isBankStatementCreditConfirmed: boolean;
   notes?: string;
-}
-
-export interface PaystackWebhookPayload {
-  event: string;
-  data: {
-    id: number;
-    reference: string;
-    amount: number; // In kobo per Paystack spec
-    status: string; // 'success', 'failed', 'abandoned'
-    currency: string;
-    channel: string;
-    paid_at: string;
-    metadata?: {
-      orderId?: string;
-      orderCode?: string;
-      invoiceId?: string;
-      invoiceNumber?: string;
-      paymentType?: PaymentType;
-      clientPhone?: string;
-    };
-  };
 }
 
 export interface ReconciliationDiscrepancy {

@@ -65,7 +65,7 @@ export interface Receipt {
   invoiceId: string;
   paymentId: string;
   paymentDate: string;
-  paymentMethod: 'manual_transfer' | 'paystack' | 'bank_deposit';
+  paymentMethod: 'manual_transfer' | 'bank_deposit';
   amountReceivedKobo: bigint;
   invoiceTotalKobo: bigint;
   paidToDateKobo: bigint;
@@ -99,7 +99,7 @@ export interface GenerateReceiptInput {
   invoiceId: string;
   paymentId: string;
   paymentDate: string;
-  paymentMethod: 'manual_transfer' | 'paystack' | 'bank_deposit';
+  paymentMethod: 'manual_transfer' | 'bank_deposit';
   amountReceivedKobo: bigint;
   isDeliveryTimeframeConfirmed: boolean;
   overpaymentReason?: string;

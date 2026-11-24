@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { useCart } from '../../order/cartContext';
 import { formatMoneyKobo } from '../../lib/money';
@@ -19,6 +19,17 @@ export function CartDrawer() {
     setIsCartOpen,
   } = useCart();
 
+  useEffect(() => {
+    if (!isCartOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsCartOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCartOpen, setIsCartOpen]);
+
   if (!isCartOpen) return null;
 
   return (
@@ -31,31 +42,31 @@ export function CartDrawer() {
       {/* Backdrop */}
       <div
         onClick={() => setIsCartOpen(false)}
-        className="fixed inset-0 bg-[#0B0A09]/80 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
       />
 
       {/* Drawer panel */}
-      <div className="relative w-full max-w-md bg-[#17120F] text-[#F7EFD9] border-l border-[#D4AF37]/30 shadow-2xl flex flex-col h-full z-10">
+      <div className="relative w-full max-w-md bg-[var(--bg-card)] text-[var(--text-primary)] border-l border-[var(--border-gold)] shadow-2xl flex flex-col h-full z-10">
         {/* Header */}
-        <div className="p-5 border-b border-[#D4AF37]/20 flex items-center justify-between bg-gradient-to-r from-[#241A14] to-[#17120F]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37]">
-              <ShoppingBag className="w-4 h-4" />
+        <div className="p-5 border-b border-[var(--border-card)] flex items-center justify-between gap-2 bg-[var(--bg-surface-muted)]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-[var(--cta-wine-bg)] border border-[var(--border-gold)] flex items-center justify-center text-[var(--icon-on-wine)] shrink-0">
+              <ShoppingBag className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="font-serif text-lg font-bold text-[#F7EFD9]">Your Order</h2>
-              <p className="text-xs text-[#D4AF37]">
+            <div className="min-w-0">
+              <h2 className="font-serif text-lg font-bold text-[var(--text-primary)]">Your Order</h2>
+              <p className="text-sm text-[var(--text-accent)] font-medium">
                 {totalItemsCount} {totalItemsCount === 1 ? 'dish' : 'dishes'} selected
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {items.length > 0 && (
               <button
                 type="button"
                 onClick={clearCart}
-                className="text-xs text-[#F7EFD9]/60 hover:text-[#FF8585] transition-colors px-2 py-1 cursor-pointer"
+                className="min-h-[44px] min-w-[44px] text-sm font-medium text-[var(--text-body-muted)] hover:text-[var(--text-accent)] transition-colors px-3 py-2 rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
               >
                 Clear all
               </button>
@@ -64,9 +75,9 @@ export function CartDrawer() {
               type="button"
               onClick={() => setIsCartOpen(false)}
               aria-label="Close cart drawer"
-              className="w-8 h-8 rounded-full bg-[#0B0A09] border border-[#D4AF37]/30 text-[#D4AF37] hover:border-[#D4AF37] flex items-center justify-center cursor-pointer transition-colors"
+              className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--bg-primary)] border border-[var(--border-gold)] text-[var(--text-accent)] hover:opacity-90 flex items-center justify-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -75,73 +86,74 @@ export function CartDrawer() {
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {items.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-              <div className="w-16 h-16 rounded-full bg-[#0B0A09] border border-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37]/40">
+              <div className="w-16 h-16 rounded-full bg-[var(--bg-primary)] border border-[var(--border-card)] flex items-center justify-center text-[var(--text-accent)]">
                 <ShoppingBag className="w-8 h-8" />
               </div>
-              <h3 className="font-serif text-lg font-semibold text-[#F7EFD9]">Your cart is empty</h3>
-              <p className="text-xs text-[#F7EFD9]/60 max-w-xs">
-                Explore our signature party jollof, slow-simmered soups, and sides to start your order.
+              <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">
+                Your cart is empty
+              </h3>
+              <p className="text-sm text-[var(--text-body-muted)] max-w-xs">
+                Explore our signature party jollof, slow-simmered soups, and sides to start your
+                order.
               </p>
             </div>
           ) : (
             items.map((item) => (
               <div
                 key={item.key}
-                className="p-3.5 rounded-xl bg-[#0B0A09]/70 border border-[#D4AF37]/20 flex items-start justify-between gap-3"
+                className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-card)] flex items-start justify-between gap-3"
               >
-                <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-baseline justify-between gap-2">
-                    <h4 className="font-serif font-bold text-sm text-[#F7EFD9] truncate">
+                    <h4 className="font-serif font-bold text-base text-[var(--text-primary)] truncate">
                       {item.name}
                     </h4>
-                    <span className="font-mono font-bold text-xs text-[#D4AF37] shrink-0">
+                    <span className="font-mono price-tabular font-bold text-sm text-[var(--text-accent)] shrink-0 whitespace-nowrap">
                       {formatMoneyKobo(item.itemTotalKobo)}
                     </span>
                   </div>
 
-                  {/* Size tier pill */}
                   {item.selectedTierName && (
-                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 mr-1.5">
+                    <p className="text-sm font-semibold text-[var(--text-accent)]">
                       Size: {item.selectedTierName}
-                    </span>
+                    </p>
                   )}
 
-                  {/* Options */}
                   {item.selectedOptionNames && item.selectedOptionNames.length > 0 && (
-                    <p className="text-[11px] text-[#F7EFD9]/70 italic truncate">
+                    <p className="text-sm text-[var(--text-body-muted)] italic truncate">
                       + {item.selectedOptionNames.join(', ')}
                     </p>
                   )}
 
                   {/* Stepper & remove */}
                   <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-2 bg-[#17120F] border border-[#D4AF37]/30 rounded-lg p-0.5">
+                    <div className="flex items-center gap-1.5 bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-xl p-1">
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.key, item.quantity - 1)}
-                        className="w-6 h-6 rounded bg-[#0B0A09] text-[#D4AF37] hover:bg-[#241A14] flex items-center justify-center cursor-pointer"
-                        aria-label="Decrease quantity"
+                        className="min-w-[44px] min-h-[44px] rounded-lg bg-[var(--bg-surface-muted)] text-[var(--text-accent)] hover:opacity-90 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+                        aria-label={`Decrease quantity of ${item.name}`}
                       >
-                        <Minus className="w-3 h-3" />
+                        <Minus className="w-4 h-4" />
                       </button>
-                      <span className="font-mono text-xs font-bold text-[#F7EFD9] w-5 text-center">
+                      <span className="font-mono price-tabular text-sm font-bold text-[var(--text-primary)] min-w-[2rem] text-center">
                         {item.quantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.key, item.quantity + 1)}
-                        className="w-6 h-6 rounded bg-[#0B0A09] text-[#D4AF37] hover:bg-[#241A14] flex items-center justify-center cursor-pointer"
-                        aria-label="Increase quantity"
+                        className="min-w-[44px] min-h-[44px] rounded-lg bg-[var(--bg-surface-muted)] text-[var(--text-accent)] hover:opacity-90 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+                        aria-label={`Increase quantity of ${item.name}`}
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-4 h-4" />
                       </button>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => removeItem(item.key)}
-                      aria-label="Remove item"
-                      className="text-[#F7EFD9]/40 hover:text-[#FF8585] transition-colors p-1 cursor-pointer"
+                      aria-label={`Remove ${item.name} from cart`}
+                      className="min-w-[44px] min-h-[44px] text-[var(--text-body-muted)] hover:text-[var(--text-error)] transition-colors rounded-lg flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -153,8 +165,8 @@ export function CartDrawer() {
 
           {/* Allergen reminder */}
           {items.length > 0 && (
-            <div className="p-3 rounded-lg bg-[#0B0A09]/60 border border-[#D4AF37]/20 flex items-start gap-2 text-[11px] text-[#F7EFD9]/70 leading-relaxed">
-              <AlertTriangle className="w-3.5 h-3.5 text-[#D4AF37] shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-lg bg-[var(--bg-surface-muted)] border border-[var(--border-card)] flex items-start gap-2.5 text-sm text-[var(--text-body-muted)] leading-relaxed">
+              <AlertTriangle className="w-4 h-4 text-[var(--icon-on-surface)] shrink-0 mt-1" />
               <span>{ALLERGEN_NOTICE}</span>
             </div>
           )}
@@ -162,15 +174,17 @@ export function CartDrawer() {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="p-5 bg-[#0B0A09] border-t border-[#D4AF37]/20 space-y-4">
-            <div className="flex items-baseline justify-between">
+          <div className="p-5 bg-[var(--bg-surface-muted)] border-t border-[var(--border-card)] space-y-4">
+            <div className="flex items-baseline justify-between gap-2">
               <div>
-                <span className="text-xs uppercase tracking-wider text-[#F7EFD9]/60 block font-medium">
+                <span className="text-sm uppercase tracking-wider text-[var(--text-primary)] block font-semibold">
                   Subtotal
                 </span>
-                <span className="text-[11px] text-[#F7EFD9]/45">Delivery calculated at checkout</span>
+                <span className="text-sm text-[var(--text-body-muted)]">
+                  Delivery calculated at checkout
+                </span>
               </div>
-              <span className="font-sans font-bold text-xl text-[#D4AF37]">
+              <span className="font-sans price-tabular font-bold text-xl text-[var(--text-accent)] whitespace-nowrap">
                 {formatMoneyKobo(subtotalKobo)}
               </span>
             </div>
@@ -178,10 +192,10 @@ export function CartDrawer() {
             <Link
               href="/checkout"
               onClick={() => setIsCartOpen(false)}
-              className="w-full bg-gradient-to-r from-[#D4AF37] to-[#B08D26] hover:from-[#E5C158] hover:to-[#D4AF37] text-[#0B0A09] font-bold text-sm py-3 px-5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-center"
+              className="w-full min-h-[48px] bg-[var(--cta-gold-bg)] hover:bg-[var(--cta-gold-hover)] text-[var(--cta-gold-text)] font-bold text-base py-3 px-5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             >
               <span>Proceed to Checkout</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 shrink-0" />
             </Link>
           </div>
         )}

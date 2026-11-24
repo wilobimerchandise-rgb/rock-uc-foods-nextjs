@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAuthRouteRequest, authJson } from '@/src/auth/route-helper';
 import { login, AuthError } from '@/src/auth/login-core';
-import { createLoginDeps } from '@/src/auth/wiring';
-import { getSessionCookieOptions } from '@/src/auth/cookies';
+import { createCookieLoginDeps } from '@/src/auth/wiring';
+import { getSessionCookieOptions, getRememberCookieOptions } from '@/src/auth/cookies';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,12 +13,13 @@ export async function POST(request: NextRequest) {
   }
 
   const { body, ipHash } = validation;
-  const deps = createLoginDeps(ipHash);
+  const deps = createCookieLoginDeps(ipHash);
 
   try {
     const result = await login(body, deps);
     const sessionRes = await deps.auth.getSession();
-    const sessionToken = sessionRes.session?.access_token || `tok-${Date.now()}`;
+    const sessionToken =
+      deps.getSessionToken() || sessionRes.session?.access_token || `tok-${Date.now()}`;
 
     const response = authJson({
       step: result.step,
@@ -26,14 +27,23 @@ export async function POST(request: NextRequest) {
       next: result.next,
     });
 
-    // Set session cookie
-    const cookieOpts = getSessionCookieOptions(sessionToken);
+    // Set HttpOnly session cookie: 30 days if "Keep me signed in" checked, browser-session otherwise
+    const cookieOpts = getSessionCookieOptions(sessionToken, result.remember);
     response.cookies.set(cookieOpts.name, cookieOpts.value, {
       httpOnly: cookieOpts.httpOnly,
       sameSite: cookieOpts.sameSite,
       secure: cookieOpts.secure,
       path: cookieOpts.path,
-      maxAge: cookieOpts.maxAge,
+      ...(cookieOpts.maxAge !== undefined ? { maxAge: cookieOpts.maxAge } : {}),
+    });
+
+    const rememberOpts = getRememberCookieOptions(result.remember);
+    response.cookies.set(rememberOpts.name, rememberOpts.value, {
+      httpOnly: rememberOpts.httpOnly,
+      sameSite: rememberOpts.sameSite,
+      secure: rememberOpts.secure,
+      path: rememberOpts.path,
+      ...(rememberOpts.maxAge !== undefined ? { maxAge: rememberOpts.maxAge } : {}),
     });
 
     return response;

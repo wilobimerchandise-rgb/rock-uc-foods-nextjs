@@ -12,10 +12,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isSameOrigin } from '@/src/lib/same-origin';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '@/src/auth/wiring';
 import { prepareInvoiceShare } from '@/src/invoices/share';
 import { AuthorizationError, UserProfile } from '@/src/lib/auth/access';
 import { RateLimitError } from '@/src/lib/rate-limit';
+import { ServiceUnavailableError } from '@/src/lib/operations';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +39,7 @@ export async function POST(
   }
 
   // 2. Authentication
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -51,9 +56,7 @@ export async function POST(
     );
   }
 
-  const hasVerifiedTotp =
-    (user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ?? false) ||
-    sessionRes.session?.aal === 'aal2';
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
 
   const userProfile: UserProfile = {
     id: profile.id,
@@ -85,6 +88,12 @@ export async function POST(
       }
     );
   } catch (err: any) {
+    if (err instanceof ServiceUnavailableError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
     if (err instanceof RateLimitError) {
       return NextResponse.json(
         { error: err.message },

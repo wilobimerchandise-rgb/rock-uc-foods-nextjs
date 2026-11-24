@@ -69,8 +69,8 @@ describe('Section 27: Mobile Layout Guard & Viewport Hardening', () => {
     });
   });
 
-  describe('3. Admin Tab Strip (10 Tabs & Overflow Containment)', () => {
-    it('contains all 10 tabs in the exact order specified in Section 27.1', () => {
+  describe('3. Admin Tab Strip (13 Tabs & Overflow Containment)', () => {
+    it('contains all 13 tabs in exact order including Team & Staff, Delivery Zones, and Site Content CMS', () => {
       const expectedLabels = [
         'Live Orders',
         'Kitchen (KDS)',
@@ -78,10 +78,13 @@ describe('Section 27: Mobile Layout Guard & Viewport Hardening', () => {
         'Events & Invoices',
         'Estimator Pricing',
         'Bank Reconciliation',
+        'Team & Staff',
         'Security & MFA',
         'Alerts Outbox',
         'Reports & Promos',
         'Menu Catalog & CSV',
+        'Delivery Zones',
+        'Site Content CMS',
       ];
 
       expect(ADMIN_TAB_ITEMS.map((t) => t.label)).toEqual(expectedLabels);

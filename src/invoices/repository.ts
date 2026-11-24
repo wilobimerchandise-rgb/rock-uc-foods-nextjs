@@ -85,8 +85,30 @@ class InvoiceRepository {
     return false;
   }
 
-  getAll(): StoredInvoice[] {
-    return Array.from(this.invoices.values());
+  getAll(options?: { autoExpireDrafts?: boolean }): StoredInvoice[] {
+    const now = Date.now();
+    const list = Array.from(this.invoices.values());
+
+    // Auto-expire old drafts if underlying estimate has expired
+    if (options?.autoExpireDrafts !== false) {
+      for (const inv of list) {
+        if (inv.status === 'draft') {
+          const est = estimateRepository.getById(inv.estimateId);
+          if (est && new Date(est.validUntil).getTime() < now) {
+            inv.status = 'void';
+            inv.voidReason = 'Auto-expired: estimate validity period (48 hours) elapsed';
+            this.invoices.set(inv.id, { ...inv });
+          }
+        }
+      }
+    }
+
+    // Sort: Drafts first, then newest first
+    return list.sort((a, b) => {
+      if (a.status === 'draft' && b.status !== 'draft') return -1;
+      if (b.status === 'draft' && a.status !== 'draft') return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   }
 }
 

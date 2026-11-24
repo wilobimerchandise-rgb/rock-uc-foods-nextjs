@@ -17,6 +17,7 @@ export const PUBLIC_ROUTES: PublicRoute[] = [
   { path: '/menu', priority: 0.9, changeFrequency: 'daily' },
   { path: '/catering', priority: 0.8, changeFrequency: 'weekly' },
   { path: '/estimate', priority: 0.8, changeFrequency: 'weekly' },
+  { path: '/refund-policy', priority: 0.4, changeFrequency: 'monthly' },
   { path: '/privacy', priority: 0.3, changeFrequency: 'monthly' },
   { path: '/terms', priority: 0.3, changeFrequency: 'monthly' },
 ];

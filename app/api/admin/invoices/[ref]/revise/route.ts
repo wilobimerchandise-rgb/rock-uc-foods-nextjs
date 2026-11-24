@@ -13,7 +13,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isSameOrigin } from '@/src/lib/same-origin';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '@/src/auth/wiring';
 import { reviseInvoice } from '@/src/invoices/revise';
 import { AuthorizationError, UserProfile } from '@/src/lib/auth/access';
 import { formatNaira } from '@/src/lib/money';
@@ -35,7 +39,7 @@ export async function POST(
   }
 
   // 2. Authentication
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -52,9 +56,7 @@ export async function POST(
     );
   }
 
-  const hasVerifiedTotp =
-    (user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ?? false) ||
-    sessionRes.session?.aal === 'aal2';
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
 
   const userProfile: UserProfile = {
     id: profile.id,

@@ -76,11 +76,11 @@ export function extractOrderReference(narration: string): string | null {
 }
 
 /**
- * Parses raw CSV lines from Moniepoint, GTBank, Zenith, or standard bank exports.
+ * Parses raw CSV lines from GTBank, Zenith, or standard Nigerian bank exports.
  */
 export function parseStatementCsv(
   csvContent: string,
-  bankName: string = 'Moniepoint'
+  bankName: string = 'GTBank'
 ): ParsedBankTxn[] {
   if (!csvContent || csvContent.trim() === '') {
     return [];
@@ -202,6 +202,7 @@ export function reconcileTransactions(
     const matchedOrder = orders.find(
       (o) =>
         o.orderCode.toUpperCase() === txn.extractedRef!.toUpperCase() ||
+        (o.paymentReference && o.paymentReference.toUpperCase() === txn.extractedRef!.toUpperCase()) ||
         (o.id && o.id.toUpperCase() === txn.extractedRef!.toUpperCase())
     );
 
@@ -219,6 +220,7 @@ export function reconcileTransactions(
 
     // Check if order was already confirmed
     const isAlreadyPaid =
+      matchedOrder.status === 'paid' ||
       matchedOrder.status === 'payment_confirmed' ||
       matchedOrder.status === 'in_kitchen' ||
       matchedOrder.status === 'ready_for_dispatch' ||

@@ -15,12 +15,14 @@ import {
   sendOrderNotification,
   sendCateringNotification,
 } from '../src/notifications/notificationEngine';
+import { resetBusinessSettings } from '../src/lib/businessSettings';
 import { Order } from '../src/types/order';
 import { Invoice } from '../src/types/invoice';
 
 describe('Playbook Section 25: Automated Customer Notifications & Alerts', () => {
   beforeEach(() => {
     notificationRepository.clear();
+    resetBusinessSettings();
   });
 
   describe('1. Nigerian Phone Normalization & Telco Identification', () => {
@@ -75,6 +77,7 @@ describe('Playbook Section 25: Automated Customer Notifications & Alerts', () =>
       status: 'pending_payment',
       policyVersion: 'v4.0',
       policyAcceptedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
       items: [
         {
           id: 'item-01',
@@ -162,9 +165,9 @@ describe('Playbook Section 25: Automated Customer Notifications & Alerts', () =>
       balanceKobo: 87300000n, // ₦873,000.00 (30%)
       status: 'issued',
       bankDetails: {
-        bankName: 'Moniepoint MFB',
-        accountNumber: '6625890251',
-        accountName: 'ROCK UC FOODS',
+        bankName: 'Guaranty Trust Bank (GTBank)',
+        accountNumber: '0013190627',
+        accountName: 'Esther Kwentua',
         verifiedByOwner: true,
       },
       paymentTerms: '70% deposit to confirm date, 30% balance upon delivery.',
@@ -173,15 +176,35 @@ describe('Playbook Section 25: Automated Customer Notifications & Alerts', () =>
       updatedAt: new Date().toISOString(),
     };
 
-    it('renders catering_invoice_sent with 70% deposit and 30% balance', () => {
+    it('renders catering_invoice_sent with 70% deposit, 30% balance, and verified GTBank details', () => {
       const rendered = renderCateringTemplate('catering_invoice_sent', sampleInvoice);
 
       expect(rendered.plainText).toContain('₦2,910,000.00');
       expect(rendered.plainText).toContain('₦2,037,000.00 (70%)');
       expect(rendered.plainText).toContain('₦873,000.00');
 
-      expect(rendered.whatsAppText).toContain('6625890251');
-      expect(rendered.whatsAppText).toContain('Moniepoint MFB');
+      expect(rendered.whatsAppText).toContain('0013190627');
+      expect(rendered.whatsAppText).toContain('Guaranty Trust Bank (GTBank)');
+      expect(rendered.whatsAppText).toContain('Esther Kwentua');
+      expect(rendered.whatsAppText).not.toContain('6625890251');
+      expect(rendered.whatsAppText).not.toContain('Moniepoint');
+    });
+
+    it('fails closed in catering_invoice_sent when bank details are unverified or missing', () => {
+      const unverifiedInvoice: Invoice = {
+        ...sampleInvoice,
+        bankDetails: {
+          bankName: 'Guaranty Trust Bank (GTBank)',
+          accountNumber: '0013190627',
+          accountName: 'Esther Kwentua',
+          verifiedByOwner: false,
+        },
+      };
+
+      const rendered = renderCateringTemplate('catering_invoice_sent', unverifiedInvoice);
+      expect(rendered.whatsAppText).toContain('Payment details will be sent by ROCK UC FOODS.');
+      expect(rendered.whatsAppText).not.toContain('0013190627');
+      expect(rendered.whatsAppText).not.toContain('6625890251');
     });
 
     it('renders catering_receipt_sent with date confirmation', () => {
@@ -204,6 +227,7 @@ describe('Playbook Section 25: Automated Customer Notifications & Alerts', () =>
       status: 'payment_confirmed',
       policyVersion: 'v4.0',
       policyAcceptedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
       items: [],
       subtotalKobo: 300000n,
       deliveryFeeKobo: 100000n,

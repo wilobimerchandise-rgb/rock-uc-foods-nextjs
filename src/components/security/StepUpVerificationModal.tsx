@@ -44,10 +44,8 @@ export function StepUpVerificationModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 'usr-owner-01',
           code: code.trim(),
           purpose,
-          userRole: 'owner',
         }),
       });
 
@@ -65,32 +63,44 @@ export function StepUpVerificationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#17120F] border border-[#D4AF37]/40 w-full max-w-md rounded-2xl p-6 shadow-2xl relative text-[#F7EFD9]">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="stepup-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--ink)]/80 backdrop-blur-sm animate-fade-in"
+    >
+      <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] w-full max-w-md rounded-2xl p-6 shadow-2xl relative text-[var(--text-primary)]">
         <button
+          type="button"
           onClick={onCancel}
-          className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+          className="absolute top-3 right-3 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg text-[var(--text-body-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+          aria-label="Cancel verification"
           title="Cancel"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center shrink-0">
-            <Lock className="w-5 h-5 text-[#D4AF37]" />
+        <div className="flex items-center space-x-3 mb-4 pr-10">
+          <div className="w-11 h-11 rounded-xl bg-[var(--cta-wine-bg)] border border-[var(--border-gold)] flex items-center justify-center shrink-0">
+            <Lock className="w-5 h-5 text-[var(--gold-light)]" />
           </div>
           <div>
-            <h3 className="text-base font-black text-white">{title}</h3>
-            <span className="text-[10px] text-[#D4AF37] uppercase tracking-wider font-bold">
+            <h3 id="stepup-modal-title" className="text-base font-bold text-[var(--text-primary)]">
+              {title}
+            </h3>
+            <span className="text-sm text-[var(--text-accent)] uppercase tracking-wider font-bold">
               Protected by Owner TOTP MFA
             </span>
           </div>
         </div>
 
-        <p className="text-xs text-[#F7EFD9]/70 mb-5 leading-relaxed">{description}</p>
+        <p className="text-sm text-[var(--text-body-muted)] mb-5 leading-relaxed">{description}</p>
 
         {error && (
-          <div className="mb-4 p-3 bg-rose-950/50 border border-rose-500/50 rounded-xl flex items-center space-x-2 text-xs text-rose-300">
+          <div
+            role="alert"
+            className="mb-4 p-3 bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] rounded-xl flex items-center space-x-2 text-sm font-semibold text-[var(--status-danger-text)]"
+          >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -98,17 +108,18 @@ export function StepUpVerificationModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-[#F7EFD9]/80 mb-1">
+            <label htmlFor="stepup-totp-code" className="block text-sm font-bold text-[var(--text-primary)] mb-1">
               6-Digit Authenticator or Backup Code
             </label>
             <input
+              id="stepup-totp-code"
               type="text"
               autoFocus
               maxLength={10}
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="e.g. 123456 or ABCD-1234"
-              className="w-full text-center tracking-widest text-lg font-mono py-2.5 px-3 bg-black/50 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#D4AF37]"
+              className="w-full min-h-[44px] text-center tracking-widest text-lg font-mono py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
             />
           </div>
 
@@ -116,19 +127,19 @@ export function StepUpVerificationModal({
             <button
               type="button"
               onClick={onCancel}
-              className="w-1/2 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors"
+              className="w-1/2 min-h-[44px] py-2.5 px-3 bg-[var(--bg-surface-muted)] hover:bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-card)] rounded-xl text-sm font-semibold transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !code.trim()}
-              className="w-1/2 py-2.5 bg-[#6B1230] hover:bg-[#85163c] text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              className="w-1/2 min-h-[44px] py-2.5 px-3 bg-[var(--cta-wine-bg)] hover:bg-[#85163c] text-[var(--cta-wine-text)] border border-[var(--border-gold)] rounded-xl text-sm font-bold shadow-lg transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
             >
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
-                <KeyRound className="w-4 h-4 text-[#D4AF37]" />
+                <KeyRound className="w-4 h-4 text-[var(--gold-light)]" />
               )}
               <span>Verify &amp; Proceed</span>
             </button>

@@ -91,7 +91,7 @@ describe('Phase 1E: Staff User Management Engine', () => {
     // Verify audit
     const createdAudits = getAuditEvents().filter((e) => e.action === 'user.staff_created');
     expect(createdAudits.length).toBe(1);
-    expect(createdAudits[0].details.fullName).toBe('Bolanle Adeleke');
+    expect(createdAudits[0].details?.fullName).toBe('Bolanle Adeleke');
 
     // Update staff member
     const updated = updateStaffUser(
@@ -219,7 +219,7 @@ describe('Phase 1E: Staff User Management Engine', () => {
 
     const deactAudits = getAuditEvents().filter((e) => e.action === 'user.staff_deactivated');
     expect(deactAudits.length).toBe(1);
-    expect(deactAudits[0].details.userId).toBe('usr-staff-01');
+    expect(deactAudits[0].details?.userId).toBe('usr-staff-01');
   });
 
   it('7. Lost-Phone Recovery: Resetting MFA clears registered factor and logs audit event', () => {
@@ -238,7 +238,7 @@ describe('Phase 1E: Staff User Management Engine', () => {
 
     const mfaAudits = getAuditEvents().filter((e) => e.action === 'user.mfa_reset');
     expect(mfaAudits.length).toBe(1);
-    expect(mfaAudits[0].details.userId).toBe('usr-dev-01');
+    expect(mfaAudits[0].details?.userId).toBe('usr-dev-01');
   });
 
   it('8. Password Reset: Owner can reset user password with minimum length enforcement', () => {
@@ -255,6 +255,6 @@ describe('Phase 1E: Staff User Management Engine', () => {
 
     const passAudits = getAuditEvents().filter((e) => e.action === 'user.password_reset');
     expect(passAudits.length).toBe(1);
-    expect(passAudits[0].details.userId).toBe('usr-staff-01');
+    expect(passAudits[0].details?.userId).toBe('usr-staff-01');
   });
 });

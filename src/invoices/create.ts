@@ -23,13 +23,15 @@ import { computeEstimate } from '../estimator/compute';
 import { getEstimatorConfig } from '../estimator/config';
 import { normalizeNigerianPhone } from '../lib/security';
 import { MAX_KOBO, formatNaira } from '../lib/money';
-import { checkRateLimit, RateLimitError } from '../lib/rate-limit';
+import { checkRateLimit, RateLimitError, RateLimitResult } from '../lib/rate-limit';
 import { recordAudit } from '../lib/audit';
+import { isInvoiceRequestsPaused, ServiceUnavailableError } from '../lib/operations';
 import { generatePublicRef, generateAccessToken } from './publicRef';
 
 export interface CreateInvoiceDeps {
   ip?: string;
   nowMs?: number;
+  checkRateLimitFn?: (key: string, limit?: number, windowMs?: number) => RateLimitResult;
   sendEmailAlert?: (payload: {
     recipients: string[];
     publicRef: string;
@@ -51,23 +53,30 @@ export async function createInvoiceFromEstimate(
   contact: InvoiceContactInput,
   deps: CreateInvoiceDeps = {}
 ): Promise<CreateInvoiceResult> {
-  const { ip = 'unknown', nowMs = Date.now(), sendEmailAlert, generateRefFn = generatePublicRef } = deps;
+  const {
+    ip = 'unknown',
+    nowMs = Date.now(),
+    checkRateLimitFn = checkRateLimit,
+    sendEmailAlert,
+    generateRefFn = generatePublicRef,
+  } = deps;
 
-  // 1. Rate Limit Check (fails CLOSED on limiter error or limit reached)
-  try {
-    const ipHash = ip === 'unknown' ? 'unknown' : crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
-    const rateLimitKey = `invoice:ip:${ipHash}`;
-    const rateCheck = checkRateLimit(rateLimitKey, 10, 600 * 1000);
-    if (!rateCheck.allowed) {
-      throw new RateLimitError('Rate limit exceeded. Maximum 10 invoice requests per 10 minutes.');
-    }
-  } catch (err: any) {
-    if (err instanceof RateLimitError) throw err;
-    // Fails closed if rate limiter itself is down or throws
-    throw new RateLimitError('Rate limiter unavailable. Request rejected (fails closed).');
+  // 0. Operational Kill Switch Check (Section 31.6)
+  if (isInvoiceRequestsPaused()) {
+    recordAudit({
+      action: 'ops.invoice_request_blocked_by_kill_switch',
+      entity: 'invoice',
+      entityId: estimateId || 'unknown',
+      actorId: 'guest',
+      actorRole: 'customer',
+      details: { estimateId },
+    });
+    throw new ServiceUnavailableError(
+      'Official invoice requests are temporarily paused while our team updates pricing. Please message Chef Esther on WhatsApp at +2348033729125.'
+    );
   }
 
-  // 2. Validate Contact
+  // 1. Validate Contact
   if (!contact || typeof contact !== 'object') {
     throw new Error('Contact information is required.');
   }
@@ -89,6 +98,12 @@ export async function createInvoiceFromEstimate(
     validatedEmail = emailCandidate;
   }
 
+  // 2. Load Stored Estimate
+  const estimate = estimateRepository.getById(estimateId);
+  if (!estimate) {
+    throw new Error(`Estimate '${estimateId}' not found.`);
+  }
+
   // 3. Idempotency Check: if invoice already exists for this estimate, return it
   const existingInvoice = invoiceRepository.getByEstimateId(estimateId);
   if (existingInvoice) {
@@ -99,19 +114,13 @@ export async function createInvoiceFromEstimate(
     };
   }
 
-  // 4. Load Stored Estimate
-  const estimate = estimateRepository.getById(estimateId);
-  if (!estimate) {
-    throw new Error(`Estimate '${estimateId}' not found.`);
-  }
-
-  // 5. Expiration Check
+  // 4. Expiration Check (must happen before cross-estimate deduplication)
   const validUntilMs = new Date(estimate.validUntil).getTime();
   if (nowMs > validUntilMs) {
     throw new Error('EXPIRED, please make a new estimate');
   }
 
-  // 6. Recompute Estimate against config (Zero Trust on client-supplied figures)
+  // 5. Recompute Estimate against config (Zero Trust on client-supplied or tampered figures)
   const config = getEstimatorConfig();
   const recomputed = computeEstimate(
     {
@@ -132,9 +141,47 @@ export async function createInvoiceFromEstimate(
     throw new Error('Estimate figures do not match authoritative server calculation. Please create a fresh estimate.');
   }
 
-  // 7. Ceiling Enforcement: Refuse total above 10,000,000,000 kobo (100 million naira)
+  // 6. Ceiling Enforcement: Refuse total above 10,000,000,000 kobo (100 million naira)
   if (recomputed.grandTotalKobo > MAX_KOBO) {
     throw new Error(`Total ${formatNaira(recomputed.grandTotalKobo)} exceeds maximum allowed limit of ${formatNaira(MAX_KOBO)}.`);
+  }
+
+  // Finding 7: Return existing valid draft for same phone and inputs inside window instead of 429 lockout
+  const requestedAddOnsKey = [...(estimate.inputs.addOnIds || [])].sort().join(',');
+  const allInvoices = invoiceRepository.getAll({ autoExpireDrafts: false });
+  for (const inv of allInvoices) {
+    if (inv.status === 'draft') {
+      const priorEst = estimateRepository.getById(inv.estimateId);
+      const priorAddOnsKey = [...(priorEst?.inputs.addOnIds || [])].sort().join(',');
+      if (
+        priorEst &&
+        priorEst.contactPhone === normalizedPhone &&
+        priorEst.inputs.packageId === estimate.inputs.packageId &&
+        priorEst.inputs.guests === estimate.inputs.guests &&
+        priorAddOnsKey === requestedAddOnsKey &&
+        new Date(priorEst.validUntil).getTime() > nowMs
+      ) {
+        return {
+          invoice: inv,
+          accessToken: '',
+          isExisting: true,
+        };
+      }
+    }
+  }
+
+  // 7. Rate Limit Check (fails CLOSED on limiter error or limit reached)
+  try {
+    const ipHash = ip === 'unknown' ? 'unknown' : crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
+    const rateLimitKey = `invoice:ip:${ipHash}`;
+    const rateCheck = checkRateLimitFn(rateLimitKey, 10, 600 * 1000);
+    if (!rateCheck.allowed) {
+      throw new RateLimitError('Rate limit exceeded. Maximum 10 invoice requests per 10 minutes.');
+    }
+  } catch (err: any) {
+    if (err instanceof RateLimitError) throw err;
+    // Fails closed if rate limiter itself is down or throws
+    throw new RateLimitError('Rate limiter unavailable. Request rejected (fails closed).');
   }
 
   // 8. Generate Public Reference with Collision Retry (Max 5 tries)

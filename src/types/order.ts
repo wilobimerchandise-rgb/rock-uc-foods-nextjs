@@ -1,6 +1,6 @@
 /**
  * ROCK UC FOODS - Order and Delivery Type Definitions
- * (Playbook v2 Section 7, 8, 11 & Section 17 v3 Addendum)
+ * (Playbook v2 Section 7, 8, 11 & Manual GTBank Transfer Flow)
  * Monetary values are strictly BigInt integer kobo.
  */
 
@@ -8,11 +8,16 @@ export type DeliveryType = 'delivery' | 'collection';
 
 export type OrderStatus =
   | 'pending_payment'
+  | 'proof_submitted'
+  | 'partial'
+  | 'paid'
   | 'payment_confirmed'
   | 'in_kitchen'
   | 'ready_for_dispatch'
   | 'out_for_delivery'
   | 'delivered'
+  | 'expired'
+  | 'rejected'
   | 'cancelled';
 
 export interface DeliveryZone {
@@ -38,6 +43,28 @@ export interface OrderItemSnapshot {
   totalKoboSnapshot: bigint;
 }
 
+export interface OrderReopenLog {
+  id: string;
+  reopenedBy: string;
+  reopenedByName?: string;
+  reason: string;
+  previousExpiresAt: string;
+  newExpiresAt: string;
+  reopenedAt: string;
+}
+
+export interface OrderProofSummary {
+  id: string;
+  senderName: string;
+  transferTime: string;
+  paymentReference: string;
+  receiptFileName?: string;
+  receiptMimeType?: 'image/jpeg' | 'image/png' | 'application/pdf';
+  receiptSizeBytes?: number;
+  receiptSha256?: string;
+  submittedAt: string;
+}
+
 export interface Order {
   id: string;
   orderCode: string;
@@ -50,13 +77,21 @@ export interface Order {
   deliveryFeeKobo: bigint;
   subtotalKobo: bigint;
   totalKobo: bigint;
+  paidAmountKobo?: bigint;
   status: OrderStatus;
   specialInstructions?: string;
   policyVersion: string;
   policyAcceptedAt: string;
   paymentVerifiedAt?: string;
   paymentVerifiedBy?: string;
-  paymentReference?: string;
+  paymentVerifiedByName?: string;
+  paymentReference?: string; // Server-generated non-sequential RUC-XXXXXX narration reference
+  proofSummary?: OrderProofSummary;
+  rejectionReason?: string;
+  reopenedAt?: string;
+  reopenedBy?: string;
+  reopenReason?: string;
+  reopenLogs?: OrderReopenLog[];
   discountKobo?: bigint;
   promoCodeId?: string;
   trackingToken?: string;
@@ -83,7 +118,7 @@ export interface CreateOrderInput {
   specialInstructions?: string;
   acceptedPolicy: boolean;
   policyVersion: string;
+  promoCode?: string;
   promoCodeId?: string;
-  discountKobo?: bigint;
   items: CartItemInput[];
 }

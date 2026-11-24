@@ -22,6 +22,34 @@ export interface StoredAuditEvent extends AuditEventInput {
 
 export const auditEventLog: StoredAuditEvent[] = [];
 
+export type AuditWriterFn = (event: StoredAuditEvent) => void;
+export type AuditFailureHandler = (error: unknown, event: AuditEventInput) => void;
+
+let customAuditWriter: AuditWriterFn | null = null;
+const auditFailureHandlers: Set<AuditFailureHandler> = new Set();
+let auditFailureCount = 0;
+
+export function setAuditPersistenceWriter(writer: AuditWriterFn | null): void {
+  customAuditWriter = writer;
+}
+
+export function onAuditWriteFailure(handler: AuditFailureHandler): () => void {
+  auditFailureHandlers.add(handler);
+  return () => {
+    auditFailureHandlers.delete(handler);
+  };
+}
+
+export function getAuditFailureCount(): number {
+  return auditFailureCount;
+}
+
+export function resetAuditFailureState(): void {
+  customAuditWriter = null;
+  auditFailureHandlers.clear();
+  auditFailureCount = 0;
+}
+
 export function recordAudit(event: AuditEventInput): StoredAuditEvent {
   // Defensive check: ensure sensitive data is not leaked
   const detailsStr = JSON.stringify(event.details || {});
@@ -36,7 +64,26 @@ export function recordAudit(event: AuditEventInput): StoredAuditEvent {
     createdAt: new Date().toISOString(),
   };
 
-  auditEventLog.push(stored);
+  try {
+    if (customAuditWriter) {
+      customAuditWriter(stored);
+    }
+    auditEventLog.push(stored);
+  } catch (err) {
+    auditFailureCount += 1;
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[OPS ALERT: AUDIT WRITE FAILURE] action=${event.action} entity=${event.entity} error=${errMsg}`
+    );
+    for (const handler of auditFailureHandlers) {
+      try {
+        handler(err, event);
+      } catch {
+        // Alert handler errors must never cascade
+      }
+    }
+  }
+
   return stored;
 }
 

@@ -117,8 +117,33 @@ export async function GET(
   // 6. Issued: Generate PDF if download requested
   if (download) {
     const estimate = estimateRepository.getById(invoice.estimateId);
+    const linesSumKobo = invoice.lines.reduce(
+      (sum, l) => sum + BigInt(l.unitPriceKobo) * BigInt(l.quantity),
+      0n
+    );
+    const estDeliveryKobo = estimate?.result?.logisticsKobo
+      ? BigInt(estimate.result.logisticsKobo)
+      : 0n;
+    const estServiceKobo = estimate?.result?.serviceChargeKobo
+      ? BigInt(estimate.result.serviceChargeKobo)
+      : 0n;
+
+    let deliveryFeeKobo = estDeliveryKobo;
+    let serviceChargeKobo = estServiceKobo;
+    if (linesSumKobo + deliveryFeeKobo + serviceChargeKobo !== invoice.totalKobo) {
+      const remaining = invoice.totalKobo - linesSumKobo;
+      if (remaining >= 0n) {
+        deliveryFeeKobo = remaining >= estDeliveryKobo ? estDeliveryKobo : remaining;
+        serviceChargeKobo = remaining - deliveryFeeKobo;
+      } else {
+        deliveryFeeKobo = 0n;
+        serviceChargeKobo = 0n;
+      }
+    }
+
     const pdfData: InvoicePdfData = {
       invoiceNumber: invoice.publicRef,
+      revision: invoice.revision,
       clientName: estimate?.contactName || 'Valued Client',
       clientPhone: estimate?.contactPhone || '+2348033729125',
       clientEmail: estimate?.contactEmail,
@@ -127,8 +152,8 @@ export async function GET(
         quantity: l.quantity,
         unitPriceKobo: BigInt(l.unitPriceKobo),
       })),
-      deliveryFeeKobo: 5000000n, // ₦50,000 logistics
-      serviceChargeKobo: invoice.totalKobo - invoice.depositKobo, // derived from lines
+      deliveryFeeKobo,
+      serviceChargeKobo,
     };
 
     const pdfBuffer = await renderInvoicePdfBuffer(pdfData);

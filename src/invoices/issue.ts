@@ -11,9 +11,10 @@
  */
 
 import { StoredInvoice } from './types';
-import { invoiceRepository } from './repository';
+import { invoiceRepository, estimateRepository } from './repository';
 import { requireRole, UserProfile } from '../lib/auth/access';
 import { recordAudit } from '../lib/audit';
+import { hasVerifiedBankSettings } from '../lib/businessSettings';
 
 export function issueInvoice(
   invoiceId: string,
@@ -36,6 +37,23 @@ export function issueInvoice(
   // 3. Status Check: Must be draft
   if (invoice.status !== 'draft') {
     throw new Error(`Cannot issue invoice in '${invoice.status}' status. Only draft invoices can be issued.`);
+  }
+
+  // Finding 5: Refuse approval/issuance if estimate has expired
+  const estimate = estimateRepository.getById(invoice.estimateId);
+  if (estimate) {
+    const validUntilMs = new Date(estimate.validUntil).getTime();
+    const nowMs = new Date(nowIso).getTime();
+    if (nowMs > validUntilMs) {
+      throw new Error(`Cannot issue invoice: Estimate '${estimate.id}' has expired. Estimates are valid for 48 hours only.`);
+    }
+  }
+
+  // Finding 6: Block invoice issuance unless owner-verified bank details are configured
+  if (!hasVerifiedBankSettings()) {
+    throw new Error(
+      'Cannot issue invoice without owner-verified bank details. Payment details will be sent by ROCK UC FOODS.'
+    );
   }
 
   // 4. Update status

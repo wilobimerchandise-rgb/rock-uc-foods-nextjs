@@ -52,11 +52,11 @@ interface BatchSummaryDto {
   lines: ReconciledLineDto[];
 }
 
-const SAMPLE_MONIEPOINT_CSV = `Date,Reference,Narration,Amount,Balance
-2026-10-28,MNP-982341,"TRF/ROC-20261028-ABCD/CHIDIEBERE/GTB",18500.00,1250000.00
-2026-10-28,MNP-982342,"NIP/ESTHER/ROC-20261028-WXYZ/LUNCH",3500.00,1253500.00
-2026-10-28,MNP-982343,"TRANSFER FROM OLUWASEUN ROC-20261028-PARTIAL",2000.00,1255500.00
-2026-10-28,MNP-982344,"POS CASH SETTLEMENT UNKNOWN SENDER",15000.00,1270500.00`;
+const SAMPLE_GTBANK_CSV = `Date,Reference,Narration,Amount,Balance
+2026-10-28,GTB-982341,"TRF/RUC-20261028-ABCD/CHIDIEBERE/GTB",18500.00,1250000.00
+2026-10-28,GTB-982342,"NIP/ESTHER/RUC-20261028-WXYZ/LUNCH",3500.00,1253500.00
+2026-10-28,GTB-982343,"TRANSFER FROM OLUWASEUN RUC-20261028-PARTIAL",2000.00,1255500.00
+2026-10-28,GTB-982344,"POS CASH SETTLEMENT UNKNOWN SENDER",15000.00,1270500.00`;
 
 export function ReconciliationManager() {
   const [csvInput, setCsvInput] = useState<string>('');
@@ -75,7 +75,7 @@ export function ReconciliationManager() {
       const res = await fetch('/api/admin/reconciliation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvContent: csvInput, bankName: 'Moniepoint' }),
+        body: JSON.stringify({ csvContent: csvInput, bankName: 'GTBank' }),
       });
 
       const data = await res.json();
@@ -139,15 +139,15 @@ export function ReconciliationManager() {
   }) || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--border-card)]">
         <div>
-          <h2 className="text-xl md:text-2xl font-black text-[#F7EFD9] tracking-tight">
+          <h1 className="text-xl md:text-2xl font-serif font-bold text-[var(--text-primary)] tracking-tight">
             Bank Statement Reconciliation
-          </h2>
-          <p className="text-xs text-[#F7EFD9]/60 mt-1">
-            Automated Moniepoint &amp; Bank CSV parser with strict order code extraction and 100% BigInt kobo matching.
+          </h1>
+          <p className="text-sm text-[var(--text-body-muted)] mt-1">
+            Automated GTBank &amp; Nigerian Bank CSV parser with strict order code extraction and 100% BigInt kobo matching.
           </p>
         </div>
 
@@ -156,7 +156,7 @@ export function ReconciliationManager() {
             type="button"
             onClick={handleApplyConfirmedMatches}
             disabled={applying}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-[#1E7E34] hover:bg-[#155724] text-white rounded-xl text-xs font-bold shadow-lg transition-all disabled:opacity-50"
+            className="min-h-[44px] flex items-center justify-center gap-2 px-5 py-2.5 bg-[#166534] hover:bg-[#14532D] text-[#FFFFFF] rounded-xl text-sm font-bold shadow-lg transition-all disabled:opacity-50"
           >
             {applying ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             <span>Confirm {batchData.exactMatchCount} Exact Matches</span>
@@ -166,9 +166,16 @@ export function ReconciliationManager() {
 
       {/* Toast */}
       {toastMessage && (
-        <div className="p-3 bg-[#6B1230]/40 border border-[#D4AF37]/50 rounded-xl text-xs text-[#F7EFD9] flex items-center justify-between">
+        <div
+          role={toastMessage.startsWith('Error') || toastMessage.startsWith('Network') ? 'alert' : 'status'}
+          className="p-3.5 bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-xl text-sm text-[var(--text-primary)] flex flex-wrap items-center justify-between gap-3"
+        >
           <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)} className="text-[#D4AF37] font-bold text-xs ml-4">
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="min-h-[44px] px-3 text-[var(--text-accent)] font-bold text-sm hover:underline"
+          >
             Dismiss
           </button>
         </div>
@@ -176,36 +183,40 @@ export function ReconciliationManager() {
 
       {/* Upload & CSV Input */}
       {!batchData && (
-        <div className="bg-[#17120F] p-6 rounded-2xl border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-[#F7EFD9] flex items-center gap-2">
-              <Upload className="w-4 h-4 text-[#D4AF37]" />
+        <div className="bg-[var(--bg-card)] p-5 sm:p-6 rounded-2xl border border-[var(--border-card)] space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label
+              htmlFor="reconciliation-csv-input"
+              className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4 text-[var(--text-accent)] shrink-0" />
               <span>Paste Bank Statement (CSV)</span>
-            </span>
+            </label>
             <button
               type="button"
-              onClick={() => setCsvInput(SAMPLE_MONIEPOINT_CSV)}
-              className="text-xs text-[#D4AF37] hover:underline font-semibold"
+              onClick={() => setCsvInput(SAMPLE_GTBANK_CSV)}
+              className="min-h-[44px] px-3 text-sm text-[var(--text-accent)] hover:underline font-semibold"
             >
-              Load Sample Moniepoint CSV
+              Load Sample GTBank CSV
             </button>
           </div>
 
           <textarea
+            id="reconciliation-csv-input"
             rows={5}
             value={csvInput}
             onChange={(e) => setCsvInput(e.target.value)}
             placeholder="Date,Reference,Narration,Amount,Balance..."
-            className="w-full p-3 bg-black/40 border border-white/20 rounded-xl text-xs font-mono text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+            className="w-full p-3.5 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-xl text-base sm:text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--border-gold)]"
           />
 
           <button
             type="button"
             onClick={handleUploadAndReconcile}
             disabled={loading || !csvInput.trim()}
-            className="w-full py-3 bg-[#6B1230] hover:bg-[#85163c] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+            className="w-full min-h-[48px] py-3 px-4 bg-[#6B1230] hover:bg-[#82173B] text-[#F7EFD9] border border-[#D4AF37]/60 font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4 text-[#D4AF37]" />}
+            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4 text-[#F3D98B]" />}
             <span>Reconcile Transactions</span>
           </button>
         </div>
@@ -214,96 +225,122 @@ export function ReconciliationManager() {
       {/* Summary KPI Cards */}
       {batchData && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-[#17120F] border border-white/10 rounded-2xl">
-              <span className="text-[11px] text-[#F7EFD9]/60 font-semibold uppercase">Total Credits</span>
-              <div className="text-lg font-black text-white mt-1">{batchData.totalCreditsFormatted}</div>
-              <span className="text-[10px] text-[#F7EFD9]/40">{batchData.totalTransactions} transactions</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl space-y-1">
+              <span className="text-sm text-[var(--text-body-muted)] font-semibold uppercase block">
+                Total Credits
+              </span>
+              <div className="text-xl font-black text-[var(--text-primary)] price-tabular">
+                {batchData.totalCreditsFormatted}
+              </div>
+              <span className="text-sm text-[var(--text-body-muted)] block">
+                {batchData.totalTransactions} transactions
+              </span>
             </div>
 
-            <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl">
-              <span className="text-[11px] text-emerald-400 font-semibold uppercase flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Exact Matches
+            <div className="p-4 bg-[var(--status-success-bg)] border border-[var(--status-success-border)] rounded-2xl space-y-1">
+              <span className="text-sm text-[var(--status-success-text)] font-semibold uppercase flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Exact Matches</span>
               </span>
-              <div className="text-lg font-black text-emerald-200 mt-1">{batchData.exactMatchedFormatted}</div>
-              <span className="text-[10px] text-emerald-400/80">{batchData.exactMatchCount} orders verified</span>
+              <div className="text-xl font-black text-[var(--status-success-text)] price-tabular">
+                {batchData.exactMatchedFormatted}
+              </div>
+              <span className="text-sm text-[var(--status-success-text)] block">
+                {batchData.exactMatchCount} orders verified
+              </span>
             </div>
 
-            <div className="p-4 bg-amber-950/40 border border-amber-500/40 rounded-2xl">
-              <span className="text-[11px] text-amber-400 font-semibold uppercase flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Discrepancies
+            <div className="p-4 bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] rounded-2xl space-y-1">
+              <span className="text-sm text-[var(--status-warning-text)] font-semibold uppercase flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Discrepancies</span>
               </span>
-              <div className="text-lg font-black text-amber-200 mt-1">
+              <div className="text-xl font-black text-[var(--status-warning-text)] price-tabular">
                 {batchData.underpaidFormatted}
               </div>
-              <span className="text-[10px] text-amber-400/80">{batchData.discrepancyCount} under/overpaid</span>
+              <span className="text-sm text-[var(--status-warning-text)] block">
+                {batchData.discrepancyCount} under/overpaid
+              </span>
             </div>
 
-            <div className="p-4 bg-rose-950/40 border border-rose-500/40 rounded-2xl">
-              <span className="text-[11px] text-rose-400 font-semibold uppercase">Unmatched Suspense</span>
-              <div className="text-lg font-black text-rose-200 mt-1">{batchData.unmatchedFormatted}</div>
-              <span className="text-[10px] text-rose-400/80">{batchData.unmatchedCount} unlinked txns</span>
+            <div className="p-4 bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] rounded-2xl space-y-1">
+              <span className="text-sm text-[var(--status-danger-text)] font-semibold uppercase block">
+                Unmatched Suspense
+              </span>
+              <div className="text-xl font-black text-[var(--status-danger-text)] price-tabular">
+                {batchData.unmatchedFormatted}
+              </div>
+              <span className="text-sm text-[var(--status-danger-text)] block">
+                {batchData.unmatchedCount} unlinked txns
+              </span>
             </div>
           </div>
 
           {/* Reconciliation Identity Check Bar */}
-          <div className="flex items-center justify-between p-3 bg-black/40 border border-white/10 rounded-xl text-xs">
-            <div className="flex items-center space-x-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-white/80 font-medium">Reconciliation Identity Check:</span>
-              <span className="font-bold text-emerald-400">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[var(--text-body-muted)] font-medium">
+                Reconciliation Identity Check:
+              </span>
+              <span className="font-bold text-[var(--text-money-positive)]">
                 {batchData.reconciliationIdentityVerified ? '100% Mathematical Reconciled' : 'Discrepancy Detected'}
               </span>
             </div>
             <button
+              type="button"
               onClick={() => {
                 setBatchData(null);
                 setCsvInput('');
               }}
-              className="text-xs text-[#D4AF37] hover:underline font-semibold"
+              className="min-h-[44px] px-3 text-sm text-[var(--text-accent)] hover:underline font-semibold"
             >
               Upload New Statement
             </button>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto">
+          {/* Filter Row */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <button
+              type="button"
               onClick={() => setActiveFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all border ${
                 activeFilter === 'all'
-                  ? 'bg-[#6B1230] text-white border border-[#D4AF37]'
-                  : 'bg-white/5 text-white/60 hover:text-white'
+                  ? 'bg-[#6B1230] text-[#F7EFD9] border-[#D4AF37]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)] hover:border-[var(--border-card)]'
               }`}
             >
               All ({batchData.lines.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveFilter('exact')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all border ${
                 activeFilter === 'exact'
-                  ? 'bg-emerald-800 text-white border border-emerald-400'
-                  : 'bg-white/5 text-white/60 hover:text-white'
+                  ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-border)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)] hover:border-[var(--border-card)]'
               }`}
             >
               Exact Matches ({batchData.exactMatchCount})
             </button>
             <button
+              type="button"
               onClick={() => setActiveFilter('discrepancy')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all border ${
                 activeFilter === 'discrepancy'
-                  ? 'bg-amber-800 text-white border border-amber-400'
-                  : 'bg-white/5 text-white/60 hover:text-white'
+                  ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border-[var(--status-warning-border)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)] hover:border-[var(--border-card)]'
               }`}
             >
               Discrepancies ({batchData.discrepancyCount})
             </button>
             <button
+              type="button"
               onClick={() => setActiveFilter('unmatched')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all border ${
                 activeFilter === 'unmatched'
-                  ? 'bg-rose-800 text-white border border-rose-400'
-                  : 'bg-white/5 text-white/60 hover:text-white'
+                  ? 'bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] border-[var(--status-danger-border)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-body-muted)] border-[var(--border-subtle-card)] hover:border-[var(--border-card)]'
               }`}
             >
               Unmatched ({batchData.unmatchedCount})
@@ -311,74 +348,74 @@ export function ReconciliationManager() {
           </div>
 
           {/* Transaction Lines Table */}
-          <div className="bg-[#17120F] rounded-2xl border border-white/10 overflow-hidden">
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-card)] overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-stone-300">
-                <thead className="bg-black/50 text-stone-400 uppercase text-[10px] tracking-wider border-b border-white/10">
+              <table className="w-full text-left text-sm text-[var(--text-primary)]">
+                <thead className="bg-[var(--bg-primary)] text-[var(--text-body-muted)] uppercase text-sm tracking-wider border-b border-[var(--border-card)]">
                   <tr>
-                    <th className="p-3">Date</th>
-                    <th className="p-3">Narration</th>
-                    <th className="p-3">Amount</th>
-                    <th className="p-3">Extracted Ref</th>
-                    <th className="p-3">Matched Order</th>
-                    <th className="p-3">Status</th>
+                    <th className="p-3.5">Date</th>
+                    <th className="p-3.5">Narration</th>
+                    <th className="p-3.5">Amount</th>
+                    <th className="p-3.5">Extracted Ref</th>
+                    <th className="p-3.5">Matched Order</th>
+                    <th className="p-3.5">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-[var(--border-subtle-card)]">
                   {filteredLines.map((line) => (
-                    <tr key={line.id} className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 whitespace-nowrap font-mono text-[11px] text-stone-400">
+                    <tr key={line.id} className="hover:bg-[var(--bg-surface-muted)] transition-colors">
+                      <td className="p-3.5 whitespace-nowrap font-mono text-sm text-[var(--text-body-muted)] price-tabular">
                         {line.date}
                       </td>
-                      <td className="p-3 max-w-xs truncate text-white" title={line.narration}>
+                      <td className="p-3.5 max-w-xs truncate text-[var(--text-primary)]" title={line.narration}>
                         {line.narration}
                       </td>
-                      <td className="p-3 whitespace-nowrap font-bold text-white">
+                      <td className="p-3.5 whitespace-nowrap font-bold text-[var(--text-primary)] price-tabular">
                         {line.amountFormatted}
                       </td>
-                      <td className="p-3 whitespace-nowrap font-mono text-[11px]">
+                      <td className="p-3.5 whitespace-nowrap font-mono text-sm">
                         {line.extractedRef ? (
-                          <span className="text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded">
+                          <span className="text-[var(--text-accent)] bg-[var(--bg-primary)] border border-[var(--border-card)] px-2.5 py-1 rounded">
                             {line.extractedRef}
                           </span>
                         ) : (
-                          <span className="text-stone-500">—</span>
+                          <span className="text-[var(--text-body-muted)]">—</span>
                         )}
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="p-3.5 whitespace-nowrap">
                         {line.orderCode ? (
                           <div>
-                            <span className="font-bold text-white">{line.orderCode}</span>
-                            <span className="text-[10px] text-stone-400 block">{line.orderCustomerName}</span>
+                            <span className="font-bold text-[var(--text-primary)]">{line.orderCode}</span>
+                            <span className="text-sm text-[var(--text-body-muted)] block">{line.orderCustomerName}</span>
                           </div>
                         ) : (
-                          <span className="text-stone-500">—</span>
+                          <span className="text-[var(--text-body-muted)]">—</span>
                         )}
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="p-3.5 whitespace-nowrap">
                         {line.status === 'reconciled_exact' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                            <CheckCircle2 className="w-3 h-3" /> Exact Match
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-bold bg-[var(--status-success-bg)] text-[var(--status-success-text)] border border-[var(--status-success-border)]">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" /> Exact Match
                           </span>
                         )}
                         {line.status === 'underpaid' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                            <AlertCircle className="w-3 h-3" /> Underpaid (Short by {line.differenceFormatted})
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-bold bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border border-[var(--status-warning-border)]">
+                            <AlertCircle className="w-4 h-4 shrink-0" /> Underpaid (Short by {line.differenceFormatted})
                           </span>
                         )}
                         {line.status === 'overpaid' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                            <AlertCircle className="w-3 h-3" /> Overpaid
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-bold bg-[var(--status-info-bg)] text-[var(--status-info-text)] border border-[var(--status-info-border)]">
+                            <AlertCircle className="w-4 h-4 shrink-0" /> Overpaid
                           </span>
                         )}
                         {line.status === 'already_paid' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                            <Check className="w-3 h-3" /> Already Confirmed
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-bold bg-[var(--status-info-bg)] text-[var(--status-info-text)] border border-[var(--status-info-border)]">
+                            <Check className="w-4 h-4 shrink-0" /> Already Confirmed
                           </span>
                         )}
                         {line.status === 'unmatched' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                            <ShieldAlert className="w-3 h-3" /> Unmatched
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-bold bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] border border-[var(--status-danger-border)]">
+                            <ShieldAlert className="w-4 h-4 shrink-0" /> Unmatched
                           </span>
                         )}
                       </td>

@@ -12,6 +12,8 @@ import { Order } from '../types/order';
 import { Invoice, Receipt } from '../types/invoice';
 import { renderOrderTemplate, renderCateringTemplate } from './templates';
 import { normalizeNigerianPhone } from './phone';
+import { isWhatsappSendPaused } from '../lib/operations';
+import { logWarn } from '../lib/logger';
 
 class NotificationRepository {
   private outbox: Map<string, NotificationMessage> = new Map();
@@ -68,6 +70,30 @@ export function sendOrderNotification(
   const nowIso = new Date().toISOString();
   const notificationId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
+  if (channel === 'whatsapp' && isWhatsappSendPaused()) {
+    logWarn('WhatsApp send blocked by operational kill switch', {
+      orderId: order.id,
+      orderCode: order.orderCode,
+      eventType,
+    });
+    const pausedNotification: NotificationMessage = {
+      id: notificationId,
+      recipientPhone,
+      recipientName: order.customerName,
+      orderId: order.id,
+      orderCode: order.orderCode,
+      eventType,
+      channel,
+      message: messageBody,
+      whatsAppUrl: undefined,
+      status: 'failed',
+      errorMessage: 'Paused by admin WhatsApp operational setting.',
+      createdAt: nowIso,
+    };
+    notificationRepository.saveNotification(pausedNotification);
+    return pausedNotification;
+  }
+
   const notification: NotificationMessage = {
     id: notificationId,
     recipientPhone,
@@ -105,6 +131,28 @@ export function sendCateringNotification(
 
   const nowIso = new Date().toISOString();
   const notificationId = `notif-cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  if (channel === 'whatsapp' && isWhatsappSendPaused()) {
+    logWarn('Catering WhatsApp send blocked by operational kill switch', {
+      invoiceId: invoice.id,
+      eventType,
+    });
+    const pausedNotification: NotificationMessage = {
+      id: notificationId,
+      recipientPhone,
+      recipientName: invoice.clientName,
+      invoiceId: invoice.id,
+      eventType,
+      channel,
+      message: messageBody,
+      whatsAppUrl: undefined,
+      status: 'failed',
+      errorMessage: 'Paused by admin WhatsApp operational setting.',
+      createdAt: nowIso,
+    };
+    notificationRepository.saveNotification(pausedNotification);
+    return pausedNotification;
+  }
 
   const notification: NotificationMessage = {
     id: notificationId,

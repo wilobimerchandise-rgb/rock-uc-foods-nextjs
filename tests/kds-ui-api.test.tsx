@@ -34,11 +34,12 @@ function createMockOrder(overrides: Partial<Order> = {}): Order {
     totalKobo: 650000n,
     policyVersion: 'v4.0',
     policyAcceptedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     items: [],
     ...overrides,
-  };
+  } as Order;
 }
 
 function createMockItem(name: string): OrderItemSnapshot {

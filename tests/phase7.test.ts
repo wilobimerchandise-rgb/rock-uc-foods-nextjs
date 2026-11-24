@@ -45,11 +45,12 @@ function createTestOrder(overrides: Partial<Order> = {}): Order {
     totalKobo: 500000n,
     policyVersion: 'v2',
     policyAcceptedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     items: [],
     ...overrides,
-  };
+  } as Order;
 }
 
 function createTestItem(overrides: Partial<OrderItemSnapshot> = {}): OrderItemSnapshot {
@@ -72,7 +73,7 @@ describe('Phase 7: Reports, Promotions and Exports', () => {
   });
 
   // TEST 1: Database Migration & Schema Constraints
-  it('1. Applies 0007_promotions_and_reports.sql and enforces uppercase, percentage <= 100, and usage limits', async () => {
+  it('1. Applies 0021_promotions_and_reports.sql and enforces uppercase, percentage <= 100, and usage limits', async () => {
     const db = new PGlite();
     const sql1 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0001_foundation.sql'), 'utf-8');
     const sql2 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0002_menu_core.sql'), 'utf-8');
@@ -80,7 +81,7 @@ describe('Phase 7: Reports, Promotions and Exports', () => {
     const sql4 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0004_events_and_invoices.sql'), 'utf-8');
     const sql5 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0005_invoices_and_receipts.sql'), 'utf-8');
     const sql6 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0006_payments_and_reconciliation.sql'), 'utf-8');
-    const sql7 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0007_promotions_and_reports.sql'), 'utf-8');
+    const sql7 = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/0021_promotions_and_reports.sql'), 'utf-8');
 
     await db.exec(sql1);
     await db.exec(sql2);

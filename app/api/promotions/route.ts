@@ -9,6 +9,10 @@ import {
   validateAndCalculatePromo,
 } from '@/src/promotions/promotionEngine';
 import { PromoCode } from '@/src/types/promotion';
+import { resolveActiveAdminProfile } from '@/src/order/orderAuth';
+import { requireRole, AuthorizationError } from '@/src/lib/auth/access';
+
+export const dynamic = 'force-dynamic';
 
 function serializePromo(promo: PromoCode) {
   return {
@@ -19,11 +23,37 @@ function serializePromo(promo: PromoCode) {
   };
 }
 
-export async function GET() {
+async function authorizePromoAdmin(req: NextRequest): Promise<NextResponse | null> {
+  const authRes = await resolveActiveAdminProfile(req);
+  if ('status' in authRes) {
+    return NextResponse.json(
+      { error: authRes.error },
+      { status: authRes.status, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+  try {
+    requireRole(['owner', 'staff', 'developer'], authRes.userProfile, 'manage promotions');
+  } catch (err: unknown) {
+    if (err instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+    throw err;
+  }
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  const denied = await authorizePromoAdmin(req);
+  if (denied) return denied;
+
   const promos = promoRepository.getAll();
-  return NextResponse.json({
-    promos: promos.map(serializePromo),
-  });
+  return NextResponse.json(
+    { promos: promos.map(serializePromo) },
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -49,6 +79,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'create') {
+      const denied = await authorizePromoAdmin(req);
+      if (denied) return denied;
+
       const {
         code,
         description,
@@ -93,6 +126,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'toggle') {
+      const denied = await authorizePromoAdmin(req);
+      if (denied) return denied;
+
       const { id } = body;
       if (!id) {
         return NextResponse.json({ error: 'Promo id is required.' }, { status: 400 });

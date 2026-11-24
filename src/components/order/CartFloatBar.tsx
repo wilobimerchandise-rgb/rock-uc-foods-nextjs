@@ -14,45 +14,45 @@ export function CartFloatBar() {
   return (
     <aside
       aria-label="Active order summary"
-      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-md z-40 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="fixed bottom-4 left-4 right-20 sm:left-6 sm:right-auto sm:bottom-5 sm:max-w-md z-40"
     >
-      <div className="bg-[#17120F]/95 backdrop-blur-md border border-[#D4AF37]/50 rounded-2xl p-3.5 sm:p-4 shadow-2xl flex items-center justify-between gap-4 text-[#F7EFD9]">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl p-3 sm:p-4 shadow-2xl flex items-center justify-between gap-3 text-[var(--text-primary)]">
         <button
           type="button"
           onClick={() => setIsCartOpen(true)}
-          className="flex items-center gap-3 text-left cursor-pointer group focus:outline-none"
+          className="min-h-[44px] min-w-[44px] flex items-center gap-3 text-left cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] rounded-xl pr-2"
         >
-          <div className="relative w-10 h-10 rounded-xl bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] group-hover:scale-105 transition-transform">
+          <div className="relative w-11 h-11 rounded-xl bg-[var(--cta-wine-bg)] border border-[var(--border-gold)] flex items-center justify-center text-[var(--icon-on-wine)] group-hover:scale-105 transition-transform shrink-0">
             <ShoppingBag className="w-5 h-5" />
-            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#D4AF37] text-[#0B0A09] font-bold text-[11px] flex items-center justify-center">
-              {totalItemsCount}
+            <span className="px-1.5 py-0.5 rounded-md bg-[var(--cta-gold-bg)] text-[var(--cta-gold-text)] font-bold text-sm leading-none ml-1 sr-only">
+              {totalItemsCount} items
             </span>
           </div>
 
-          <div>
-            <span className="text-[10px] uppercase tracking-wider text-[#F7EFD9]/60 block font-semibold">
-              Current Order
+          <div className="min-w-0">
+            <span className="text-sm text-[var(--text-body-muted)] block font-medium whitespace-nowrap">
+              {totalItemsCount} {totalItemsCount === 1 ? 'item' : 'items'}
             </span>
-            <span className="font-sans font-bold text-base text-[#D4AF37]">
+            <span className="font-sans price-tabular font-bold text-base text-[var(--text-accent)] whitespace-nowrap">
               {formatMoneyKobo(subtotalKobo)}
             </span>
           </div>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setIsCartOpen(true)}
-            className="hidden sm:inline-flex px-3 py-2 rounded-xl border border-[#D4AF37]/30 hover:border-[#D4AF37] text-xs font-semibold text-[#F7EFD9] hover:bg-[#241A14] transition-colors cursor-pointer"
+            className="hidden sm:inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl border border-[var(--border-gold)] bg-[var(--bg-surface-muted)] text-sm font-semibold text-[var(--text-primary)] hover:opacity-90 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
           >
             View Cart
           </button>
           <Link
             href="/checkout"
-            className="bg-gradient-to-r from-[#D4AF37] to-[#B08D26] hover:from-[#E5C158] hover:to-[#D4AF37] text-[#0B0A09] font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center gap-1.5 whitespace-nowrap"
+            className="min-h-[44px] min-w-[44px] bg-[var(--cta-gold-bg)] hover:bg-[var(--cta-gold-hover)] text-[var(--cta-gold-text)] font-bold text-sm py-2.5 px-4 rounded-xl shadow-md transition-all inline-flex items-center justify-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
           >
             <span>Checkout</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-4 h-4 shrink-0" />
           </Link>
         </div>
       </div>

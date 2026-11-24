@@ -5,7 +5,7 @@
  * 
  * Rules:
  * 1. Fixed to bottom of screen on phones (width < 768px), md:hidden.
- * 2. Every item shows an icon (24px) AND a visible text label (13px+ semibold, single line, no truncation at 360px).
+ * 2. Every item shows an icon (24px) AND a visible text label (14px+ semibold, single line, no truncation at 360px).
  * 3. Items share width equally (flex-1), each >=56px high and >=64px wide.
  * 4. Active item: wine background (#6B1230), cream text (#F7EFD9), aria-current="page".
  * 5. Inactive items: gold (#D4AF37) or cream text with contrast >= 4.5:1. Visible focus ring.
@@ -59,7 +59,7 @@ export function BottomTabBar({ activeTab, onSelectTab, showAdmin = false }: Bott
             }`}
           >
             <IconComponent className="w-6 h-6 shrink-0" aria-hidden="true" />
-            <span className="text-[13px] leading-tight tracking-tight whitespace-nowrap overflow-hidden select-none">
+            <span className="text-[14px] leading-tight tracking-tight whitespace-nowrap overflow-hidden select-none">
               {item.label}
             </span>
           </button>

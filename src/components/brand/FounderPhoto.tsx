@@ -90,17 +90,18 @@ export const FounderPhotoModal: React.FC<{ onClose: () => void }> = ({ onClose }
       aria-labelledby="founder-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
     >
-      <div className="bg-[#17120F] border border-[#D4AF37]/50 rounded-xl max-w-lg w-full p-6 text-[#F7EFD9] shadow-2xl relative">
-        <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-xl max-w-lg w-full p-6 text-[var(--text-primary)] shadow-2xl relative">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-card)] mb-4">
           <div className="flex items-center gap-2">
-            <Camera className="w-5 h-5 text-[#D4AF37]" />
-            <h3 id="founder-modal-title" className="font-serif font-bold text-lg text-[#F7EFD9]">
+            <Camera className="w-5 h-5 text-[var(--icon-on-surface)]" />
+            <h3 id="founder-modal-title" className="font-serif font-bold text-lg text-[var(--text-primary)]">
               Owner Founder Photo Editor
             </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-white/60 hover:text-white p-1 rounded hover:bg-white/10"
+            className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] rounded-lg"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -109,7 +110,7 @@ export const FounderPhotoModal: React.FC<{ onClose: () => void }> = ({ onClose }
 
         {feedback && (
           <div
-            className={`p-3 rounded mb-4 text-xs font-semibold flex items-center gap-2 ${
+            className={`p-3 rounded mb-4 text-sm font-semibold flex items-center gap-2 ${
               feedback.type === 'error'
                 ? 'bg-[#B3261E] text-white'
                 : 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/50'
@@ -126,24 +127,24 @@ export const FounderPhotoModal: React.FC<{ onClose: () => void }> = ({ onClose }
 
         <div className="space-y-4">
           {/* Current / Preview Image Display */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 bg-[#0B0A09] p-4 rounded-lg border border-white/10">
-            <div className="w-28 h-28 sm:w-32 sm:h-32 shrink-0 overflow-hidden rounded-[12px] border border-[#D4AF37]/50 shadow">
+          <div className="flex flex-col sm:flex-row items-center gap-4 bg-[var(--bg-surface-muted)] p-4 rounded-lg border border-[var(--border-card)]">
+            <div className="w-28 h-28 sm:w-32 sm:h-32 shrink-0 overflow-hidden rounded-[12px] border border-[var(--border-gold)] shadow">
               <img
                 src={preview || activeCustom || FOUNDER_URL}
                 alt="Founder - Rock UC Foods"
                 style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
               />
             </div>
-            <div className="text-xs space-y-1 text-center sm:text-left">
-              <span className="font-semibold text-[#D4AF37] block">
+            <div className="text-sm space-y-1 text-center sm:text-left">
+              <span className="font-semibold text-[var(--text-accent)] block">
                 {preview ? 'New Photo Preview' : activeCustom ? 'Custom Upload Active' : 'Default Sacred Photo Active'}
               </span>
-              <p className="text-[#F7EFD9]/70 leading-relaxed text-[11px]">
+              <p className="text-[var(--text-body-muted)] leading-relaxed text-sm">
                 {preview
                   ? 'Click "Save Preferred Photo" to apply across all brand touchpoints.'
                   : 'Upload your preferred high-resolution photo. It will be preserved exactly as uploaded.'}
               </p>
-              <div className="pt-1 text-[10px] text-[#F7EFD9]/40 italic">
+              <div className="pt-1 text-sm text-[var(--text-body-muted)] italic">
                 Rule: No AI faces, no filters, no aspect ratio distortion.
               </div>
             </div>
@@ -163,7 +164,7 @@ export const FounderPhotoModal: React.FC<{ onClose: () => void }> = ({ onClose }
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 px-4 py-2 bg-[#17120F] hover:bg-[#6B1230]/40 text-[#D4AF37] border border-[#D4AF37]/40 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+              className="flex-1 min-h-[44px] px-4 py-2.5 bg-[var(--bg-surface-muted)] hover:opacity-90 text-[var(--text-accent)] border border-[var(--border-gold)] rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all"
             >
               <Upload className="w-4 h-4" /> Choose Image File
             </button>
@@ -172,7 +173,7 @@ export const FounderPhotoModal: React.FC<{ onClose: () => void }> = ({ onClose }
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-4 py-2 bg-[#6B1230] hover:bg-[#82173B] text-[#F7EFD9] border border-[#D4AF37] rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow"
+                className="min-h-[44px] px-4 py-2.5 bg-[#6B1230] hover:bg-[#82173B] text-[#F7EFD9] border border-[#D4AF37] rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow"
               >
                 <CheckCircle className="w-4 h-4 text-[#D4AF37]" /> Save Preferred Photo
               </button>
@@ -182,9 +183,9 @@ export const FounderPhotoModal: React.FC<{ onClose: () => void }> = ({ onClose }
               <button
                 type="button"
                 onClick={handleReset}
-                className="px-3 py-2 bg-black/40 hover:bg-black/70 text-white/70 hover:text-white border border-white/20 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                className="min-h-[44px] px-4 py-2.5 bg-[var(--bg-surface-muted)] hover:opacity-90 text-[var(--text-primary)] border border-[var(--border-card)] rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-all"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Reset to Original
+                <RotateCcw className="w-4 h-4" /> Reset to Original
               </button>
             )}
           </div>
@@ -220,7 +221,7 @@ export const FounderPhoto: React.FC<FounderPhotoProps> = ({ className = '', allo
   // SSR / Pre-hydration render guard
   if (!mounted) {
     return (
-      <div className={`relative group overflow-hidden rounded-[12px] border border-[#D4AF37]/40 shadow-xl ${className}`}>
+      <div className={`relative group overflow-hidden rounded-[12px] border border-[var(--border-gold)] shadow-xl ${className}`}>
         <img
           src={FOUNDER_URL}
           alt="Founder - Rock UC Foods"
@@ -232,7 +233,7 @@ export const FounderPhoto: React.FC<FounderPhotoProps> = ({ className = '', allo
 
   return (
     <>
-      <div className={`relative group overflow-hidden rounded-[12px] border border-[#D4AF37]/40 shadow-xl ${className}`}>
+      <div className={`relative group overflow-hidden rounded-[12px] border border-[var(--border-gold)] shadow-xl ${className}`}>
         <img
           src={imageSrc}
           alt="Founder - Rock UC Foods"
@@ -245,9 +246,9 @@ export const FounderPhoto: React.FC<FounderPhotoProps> = ({ className = '', allo
             type="button"
             onClick={() => setShowModal(true)}
             aria-label="Upload preferred founder photo"
-            className="absolute bottom-2 right-2 bg-[#17120F]/90 hover:bg-[#6B1230] text-[#D4AF37] hover:text-white border border-[#D4AF37]/60 rounded-full px-2.5 py-1 text-[11px] font-semibold flex items-center gap-1.5 backdrop-blur shadow-lg transition-all opacity-85 hover:opacity-100"
+            className="absolute bottom-2 right-2 min-w-[44px] min-h-[44px] bg-[#17120F]/95 hover:bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37] rounded-full px-3 py-2 text-sm font-semibold inline-flex items-center justify-center gap-1.5 backdrop-blur shadow-lg transition-all"
           >
-            <Camera className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <Camera className="w-4 h-4 text-[#D4AF37] shrink-0" />
             <span className="hidden sm:inline">Change Photo</span>
           </button>
         )}

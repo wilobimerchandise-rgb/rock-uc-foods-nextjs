@@ -76,11 +76,15 @@ export const EventInquiryModal: React.FC<EventInquiryModalProps> = ({
     }
   };
 
-  const copyEventCode = (code: string) => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(code);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
+  const copyEventCode = async (code: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(code);
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      }
+    } catch {
+      setError('Could not copy event reference code automatically. Please copy it manually.');
     }
   };
 
@@ -89,19 +93,20 @@ export const EventInquiryModal: React.FC<EventInquiryModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="catering-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[var(--ink)]/85 backdrop-blur-sm overflow-y-auto"
     >
-      <div className="bg-[#17120F] border border-[#D4AF37]/50 rounded-2xl max-w-xl w-full p-6 text-[#F7EFD9] shadow-2xl relative my-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl max-w-xl w-full p-6 text-[var(--text-primary)] shadow-2xl relative my-auto">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle-card)] mb-4">
           <div className="flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-[#D4AF37]" />
-            <h2 id="catering-modal-title" className="font-serif font-bold text-lg sm:text-xl text-[#F7EFD9]">
+            <CalendarDays className="w-5 h-5 text-[var(--text-accent)] shrink-0" />
+            <h2 id="catering-modal-title" className="font-serif font-bold text-lg sm:text-xl text-[var(--text-primary)]">
               Bulk Catering &amp; Event Inquiry
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-white/60 hover:text-white p-1 rounded hover:bg-white/10"
+            className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-[var(--text-body-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-surface-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -110,61 +115,67 @@ export const EventInquiryModal: React.FC<EventInquiryModalProps> = ({
 
         {submittedEvent ? (
           <div className="space-y-4 py-3 text-center">
-            <div className="w-12 h-12 bg-emerald-950/80 border border-emerald-600 rounded-full flex items-center justify-center mx-auto text-emerald-400">
+            <div className="w-12 h-12 bg-[var(--status-success-bg)] border border-[var(--status-success-border)] rounded-full flex items-center justify-center mx-auto text-[var(--status-success-text)]">
               <CheckCircle2 className="w-6 h-6" />
             </div>
 
             <div>
-              <span className="text-xs text-[#D4AF37] uppercase tracking-widest font-semibold block">
+              <span className="text-sm text-[var(--text-accent)] uppercase tracking-widest font-semibold block">
                 Inquiry Successfully Logged
               </span>
-              <h3 className="font-serif font-bold text-xl text-[#F7EFD9] mt-1">
+              <h3 className="font-serif font-bold text-xl text-[var(--text-primary)] mt-1">
                 Thank You, {submittedEvent.clientName}!
               </h3>
-              <p className="text-xs text-white/70 max-w-md mx-auto mt-1 leading-relaxed">
+              <p className="text-sm text-[var(--text-body-muted)] max-w-md mx-auto mt-1 leading-relaxed">
                 Chef Esther Kwentua will prepare your bespoke itemized quote for {submittedEvent.guestCount} guests on{' '}
                 {submittedEvent.eventDate}.
               </p>
             </div>
 
-            <div className="bg-[#0B0A09] p-3 rounded-xl border border-white/10 max-w-xs mx-auto flex items-center justify-between">
+            <div className="bg-[var(--bg-surface-muted)] p-3 rounded-xl border border-[var(--border-subtle-card)] max-w-xs mx-auto flex items-center justify-between gap-2">
               <div className="text-left">
-                <span className="text-[10px] text-white/40 block">Event Reference Code:</span>
-                <span className="font-mono font-bold text-[#D4AF37] text-sm">{submittedEvent.eventCode}</span>
+                <span className="text-sm text-[var(--text-body-muted)] block">Event Reference Code:</span>
+                <span className="font-mono font-bold text-[var(--text-accent)] text-base">{submittedEvent.eventCode}</span>
               </div>
               <button
+                type="button"
                 onClick={() => copyEventCode(submittedEvent.eventCode)}
-                className="text-white/60 hover:text-white p-1"
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-[var(--text-body-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-card)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                 aria-label="Copy reference code"
               >
-                {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                {copiedCode ? <Check className="w-5 h-5 text-[var(--status-success-text)]" /> : <Copy className="w-5 h-5" />}
               </button>
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center">
+            <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
               <a
                 href={`https://wa.me/2348033729125?text=${encodeURIComponent(
                   `Hello Chef Esther, I have submitted a catering inquiry (${submittedEvent.eventCode}) for ${submittedEvent.eventType} on ${submittedEvent.eventDate} (${submittedEvent.guestCount} guests). Kindly assist with quote.`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow"
+                className="min-h-[44px] bg-[#166534] hover:bg-[#15803D] text-white font-bold py-2.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow transition-colors"
               >
-                <MessageCircle className="w-4 h-4" /> Message Chef Esther on WhatsApp
+                <MessageCircle className="w-4 h-4 shrink-0" />
+                <span>Message Chef Esther on WhatsApp</span>
               </a>
 
               <button
+                type="button"
                 onClick={onClose}
-                className="bg-white/10 hover:bg-white/15 text-white/80 py-2.5 px-4 rounded-xl text-xs font-semibold"
+                className="min-h-[44px] bg-[var(--bg-surface-muted)] hover:bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-card)] py-2.5 px-5 rounded-xl text-sm font-semibold transition-colors"
               >
                 Done
               </button>
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
+          <form onSubmit={handleSubmit} className="space-y-4 text-sm">
             {error && (
-              <div className="p-3 bg-[#B3261E]/90 text-white rounded-lg flex items-center gap-2 text-xs">
+              <div
+                role="alert"
+                className="p-3 bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] text-[var(--status-danger-text)] rounded-lg flex items-center gap-2 text-sm font-semibold"
+              >
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
@@ -172,41 +183,46 @@ export const EventInquiryModal: React.FC<EventInquiryModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] text-white/70 mb-1">
-                  Full Name / Organization <span className="text-[#D4AF37]">*</span>
+                <label htmlFor="catering-client-name" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
+                  Full Name / Organization <span className="text-[var(--text-accent)]">*</span>
                 </label>
                 <input
+                  id="catering-client-name"
                   type="text"
                   required
                   placeholder="e.g. Bank of Industry / Aisha Bello"
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-white/70 mb-1">
-                  Nigerian Phone Number <span className="text-[#D4AF37]">*</span>
+                <label htmlFor="catering-client-phone" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
+                  Nigerian Phone Number <span className="text-[var(--text-accent)]">*</span>
                 </label>
                 <input
+                  id="catering-client-phone"
                   type="tel"
                   required
                   placeholder="0803 372 9125"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
-                  className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-[11px] text-white/70 mb-1">Event Type</label>
+                <label htmlFor="catering-event-type" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
+                  Event Type
+                </label>
                 <select
+                  id="catering-event-type"
                   value={eventType}
                   onChange={(e) => setEventType(e.target.value)}
-                  className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                 >
                   <option value="Corporate Gala / Conference">Corporate Gala / Conference</option>
                   <option value="Wedding Reception">Wedding Reception</option>
@@ -219,98 +235,114 @@ export const EventInquiryModal: React.FC<EventInquiryModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] text-white/70 mb-1">
-                  Event Date <span className="text-[#D4AF37]">*</span>
+                <label htmlFor="catering-event-date" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
+                  Event Date <span className="text-[var(--text-accent)]">*</span>
                 </label>
                 <input
+                  id="catering-event-date"
                   type="date"
                   required
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-white/70 mb-1">
-                  Expected Guests <span className="text-[#D4AF37]">*</span>
+                <label htmlFor="catering-guest-count" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
+                  Expected Guests <span className="text-[var(--text-accent)]">*</span>
                 </label>
                 <div className="relative">
                   <input
+                    id="catering-guest-count"
                     type="number"
                     min={10}
                     max={5000}
                     required
                     value={guestCount}
                     onChange={(e) => setGuestCount(Number(e.target.value))}
-                    className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg pl-3 pr-9 py-2 text-sm text-[var(--text-primary)] price-tabular focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                   />
-                  <Users className="w-3.5 h-3.5 text-white/40 absolute right-3 top-3" />
+                  <Users className="w-4 h-4 text-[var(--text-body-muted)] absolute right-3 top-3.5 pointer-events-none" />
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] text-white/70 mb-1">
-                Venue Address &amp; Lagos Location <span className="text-[#D4AF37]">*</span>
+              <label htmlFor="catering-venue-address" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
+                Venue Address &amp; Lagos Location <span className="text-[var(--text-accent)]">*</span>
               </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Landmark Centre, Water Corporation Drive, Victoria Island, Lagos"
-                value={venueAddress}
-                onChange={(e) => setVenueAddress(e.target.value)}
-                className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
-              />
+              <div className="relative">
+                <input
+                  id="catering-venue-address"
+                  type="text"
+                  required
+                  placeholder="e.g. Landmark Centre, Water Corporation Drive, Victoria Island, Lagos"
+                  value={venueAddress}
+                  onChange={(e) => setVenueAddress(e.target.value)}
+                  className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg pl-3 pr-9 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+                />
+                <MapPin className="w-4 h-4 text-[var(--text-body-muted)] absolute right-3 top-3.5 pointer-events-none" />
+              </div>
             </div>
 
             <div>
-              <label className="block text-[11px] text-white/70 mb-1">Client Email (For formal PDF quote)</label>
+              <label htmlFor="catering-client-email" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
+                Client Email (For formal PDF quote)
+              </label>
               <input
+                id="catering-client-email"
                 type="email"
                 placeholder="events@company.com"
                 value={clientEmail}
                 onChange={(e) => setClientEmail(e.target.value)}
-                className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
               />
             </div>
 
-            <div className="p-3 bg-[#0B0A09] border border-white/10 rounded-xl">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={liveCookingRequested}
-                  onChange={(e) => setLiveCookingRequested(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#6B1230] accent-[#D4AF37]"
-                />
-                <div className="flex items-center gap-1.5 text-xs text-[#F7EFD9]">
-                  <Flame className="w-4 h-4 text-[#D4AF37]" />
-                  <span className="font-semibold">Request Live Cooking / On-Site Chef Station</span>
+            <div className="p-3 bg-[var(--bg-surface-muted)] border border-[var(--border-subtle-card)] rounded-xl">
+              <label htmlFor="catering-live-cooking" className="flex items-start gap-3 cursor-pointer">
+                <div className="relative w-11 h-11 shrink-0 flex items-center justify-center">
+                  <input
+                    id="catering-live-cooking"
+                    type="checkbox"
+                    checked={liveCookingRequested}
+                    onChange={(e) => setLiveCookingRequested(e.target.checked)}
+                    className="peer appearance-none w-11 h-11 rounded-lg border border-[var(--border-card)] bg-[var(--bg-primary)] checked:bg-[var(--cta-wine-bg)] checked:border-[var(--border-gold)] cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+                  />
+                  <Check className="w-5 h-5 text-[var(--cream)] pointer-events-none absolute opacity-0 peer-checked:opacity-100" />
+                </div>
+                <div className="pt-1">
+                  <div className="flex items-center gap-1.5 text-sm text-[var(--text-primary)] font-semibold">
+                    <Flame className="w-4 h-4 text-[var(--text-accent)] shrink-0" />
+                    <span>Request Live Cooking / On-Site Chef Station</span>
+                  </div>
+                  <p className="text-sm text-[var(--text-body-muted)] mt-1 leading-relaxed">
+                    Chef Esther Kwentua and culinary team will grill and stir authentic dishes live at your event.
+                  </p>
                 </div>
               </label>
-              <p className="text-[10px] text-white/50 pl-6 mt-0.5">
-                Chef Esther Kwentua and culinary team will grill and stir authentic dishes live at your event.
-              </p>
             </div>
 
             <div>
-              <label className="block text-[11px] text-white/70 mb-1">
+              <label htmlFor="catering-special-notes" className="block text-sm font-medium text-[var(--text-body-muted)] mb-1">
                 Menu Preferences &amp; Special Instructions
               </label>
               <textarea
+                id="catering-special-notes"
                 rows={2}
                 placeholder="e.g. Jollof rice, peppered goat meat, seafood okro, plantain, mocktails..."
                 value={specialNotes}
                 onChange={(e) => setSpecialNotes(e.target.value)}
-                className="w-full bg-[#0B0A09] border border-white/10 rounded-lg p-2.5 text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                className="w-full min-h-[80px] bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
               />
             </div>
 
-            <div className="pt-2 flex justify-end gap-2">
+            <div className="pt-2 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded text-xs text-white/60 hover:text-white"
+                className="min-h-[44px] px-5 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-body-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-surface-muted)] border border-[var(--border-subtle-card)] transition-colors"
               >
                 Cancel
               </button>
@@ -318,9 +350,9 @@ export const EventInquiryModal: React.FC<EventInquiryModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="btn-luxury px-6 py-2.5 text-xs font-bold rounded-xl shadow-lg flex items-center gap-2"
+                className="btn-luxury min-h-[44px] px-6 py-2.5 text-sm font-bold rounded-xl shadow-lg inline-flex items-center gap-2 disabled:opacity-50"
               >
-                <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
+                <CalendarDays className="w-4 h-4 text-[var(--gold-light)] shrink-0" />
                 <span>{isSubmitting ? 'Submitting...' : 'Submit Catering Inquiry'}</span>
               </button>
             </div>

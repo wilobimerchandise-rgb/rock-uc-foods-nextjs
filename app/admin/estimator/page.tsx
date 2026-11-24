@@ -7,8 +7,8 @@ export const metadata: Metadata = privateMetadata;
 
 export default function AdminEstimatorPage() {
   return (
-    <main className="min-h-screen bg-stone-100/60">
+    <div className="w-full min-w-0 max-w-full">
       <EstimatorAdminClient />
-    </main>
+    </div>
   );
 }

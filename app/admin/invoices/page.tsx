@@ -3,12 +3,24 @@ import Link from 'next/link';
 import { privateMetadata } from '@/src/seo/metadata';
 import { invoiceRepository, estimateRepository, invoiceLinksRepository } from '@/src/invoices/repository';
 import { formatNaira } from '@/src/lib/money';
+import {
+  getProfileFromService,
+  resolveSessionFromRequest,
+  hasSessionVerifiedMfa,
+} from '@/src/auth/wiring';
+import { maskCustomerPhone } from '@/src/lib/security';
 import { FileText, ChevronRight, Clock, Users } from 'lucide-react';
 
 export const metadata = privateMetadata;
 export const dynamic = 'force-dynamic';
 
 export default async function AdminInvoicesPage() {
+  const sessionRes = await resolveSessionFromRequest();
+  const user = sessionRes.session?.user;
+  const profile = user ? await getProfileFromService(user.id) : null;
+  const userRole = profile?.role || 'staff';
+  const hasMfaVerified = hasSessionVerifiedMfa(sessionRes.session, profile?.hasMfaVerified);
+
   const invoices = invoiceRepository.getAll();
 
   // Sort: drafts first, then newest first
@@ -19,24 +31,26 @@ export default async function AdminInvoicesPage() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D4AF37]/20 pb-4">
+    <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8 space-y-6 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border-card)] pb-4">
         <div>
-          <h1 className="text-2xl font-serif text-[#D4AF37] font-bold">Catering Invoices</h1>
-          <p className="text-xs text-white/60">
+          <h1 className="text-2xl font-serif text-[var(--text-accent)] font-bold">
+            Catering Invoices
+          </h1>
+          <p className="text-sm text-[var(--text-body-muted)] mt-1">
             Review event estimates, issue draft invoices, and share confirmed invoices with clients.
           </p>
         </div>
-        <div className="text-xs px-3 py-1.5 rounded-full bg-[#17120F] border border-[#D4AF37]/40 text-[#D4AF37] font-semibold self-start sm:self-auto">
+        <div className="text-sm px-3.5 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-card)] text-[var(--text-accent)] font-semibold self-start sm:self-auto price-tabular">
           {invoices.length} Total {invoices.length === 1 ? 'Invoice' : 'Invoices'}
         </div>
       </div>
 
       {sorted.length === 0 ? (
-        <div className="bg-[#17120F] border border-white/10 rounded-2xl p-12 text-center space-y-3">
-          <FileText className="w-12 h-12 text-[#D4AF37]/40 mx-auto" />
-          <h3 className="text-lg font-bold text-white">No invoices yet.</h3>
-          <p className="text-xs text-white/60 max-w-sm mx-auto">
+        <div className="bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-2xl p-10 text-center space-y-3">
+          <FileText className="w-12 h-12 text-[var(--text-accent)] mx-auto" />
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">No invoices yet.</h2>
+          <p className="text-sm text-[var(--text-body-muted)] max-w-sm mx-auto">
             When clients request official invoices from the catering estimator, they will appear here as drafts for your review.
           </p>
         </div>
@@ -53,61 +67,66 @@ export default async function AdminInvoicesPage() {
               <Link
                 key={inv.id}
                 href={`/admin/invoices/${encodeURIComponent(inv.publicRef)}`}
-                className="group block bg-[#17120F] border border-white/10 hover:border-[#D4AF37]/50 rounded-xl p-4 transition-all"
+                className="group block min-h-[44px] bg-[var(--bg-card)] border border-[var(--border-subtle-card)] hover:border-[var(--border-gold)] rounded-xl p-4 transition-all"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono font-bold text-sm text-[#F7EFD9] group-hover:text-[#D4AF37] transition-colors">
+                      <span className="font-mono font-bold text-sm text-[var(--text-primary)] group-hover:text-[var(--text-accent)] transition-colors">
                         {inv.publicRef}
                       </span>
                       {isDraft && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        <span className="px-2.5 py-0.5 rounded text-sm font-bold uppercase bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border border-[var(--status-warning-border)]">
                           Draft
                         </span>
                       )}
                       {isIssued && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        <span className="px-2.5 py-0.5 rounded text-sm font-bold uppercase bg-[var(--status-success-bg)] text-[var(--status-success-text)] border border-[var(--status-success-border)]">
                           Issued
                         </span>
                       )}
                       {isVoid && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-300 border border-red-500/40">
+                        <span className="px-2.5 py-0.5 rounded text-sm font-bold uppercase bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] border border-[var(--status-danger-border)]">
                           Void
                         </span>
                       )}
                       {inv.label && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                        <span className="px-2.5 py-0.5 rounded text-sm font-medium bg-[var(--status-info-bg)] text-[var(--status-info-text)] border border-[var(--status-info-border)]">
                           {inv.label}
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-white/70">
-                      Client: <span className="text-white font-medium">{estimate?.contactName || 'Valued Client'}</span>
+                    <div className="text-sm text-[var(--text-body-muted)]">
+                      Client:{' '}
+                      <span className="text-[var(--text-primary)] font-medium">
+                        {estimate?.contactName || 'Valued Client'}
+                      </span>
                       {estimate?.contactPhone && (
-                        <span className="text-white/40 ml-2">({estimate.contactPhone})</span>
+                        <span className="text-[var(--text-body-muted)] ml-2 font-mono price-tabular">
+                          ({maskCustomerPhone(estimate.contactPhone, userRole, hasMfaVerified)})
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
+                  <div className="flex items-center justify-between sm:justify-end gap-4 text-right shrink-0">
                     <div>
-                      <div className="text-sm font-bold text-[#D4AF37]">
+                      <div className="text-base font-bold text-[var(--text-accent)] price-tabular">
                         {formatNaira(inv.totalKobo)}
                       </div>
-                      <div className="text-[11px] text-white/50 flex items-center gap-2 sm:justify-end">
+                      <div className="text-sm text-[var(--text-body-muted)] flex items-center gap-2 sm:justify-end">
                         <span className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          {estimate?.inputs?.guests || 0} guests
+                          <Users className="w-4 h-4 shrink-0" />
+                          <span>{estimate?.inputs?.guests || 0} guests</span>
                         </span>
                         {links.length > 0 && (
-                          <span className="text-emerald-400">
+                          <span className="text-[var(--text-money-positive)] font-medium">
                             • Shared {links.length}x
                           </span>
                         )}
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-white/40 group-hover:text-[#D4AF37] group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="w-5 h-5 text-[var(--text-body-muted)] group-hover:text-[var(--text-accent)] group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
               </Link>

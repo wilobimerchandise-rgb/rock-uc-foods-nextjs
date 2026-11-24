@@ -66,11 +66,14 @@ export function MfaForm() {
     };
   }, [mode, qrCode]);
 
-  const handleCopySecret = () => {
-    if (secret) {
-      navigator.clipboard.writeText(secret);
+  const handleCopySecret = async () => {
+    if (!secret) return;
+    try {
+      await navigator.clipboard?.writeText(secret);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Unable to copy secret automatically. Please highlight and copy the key manually.');
     }
   };
 
@@ -118,16 +121,16 @@ export function MfaForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-[#17120F] border border-[#D4AF37]/30 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+    <div className="w-full max-w-md mx-auto min-w-0 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-5 sm:p-8 shadow-2xl space-y-6">
       {/* Brand Header */}
       <div className="text-center space-y-2">
         <div className="flex justify-center">
           <RucLogo size={56} showWordmark={true} />
         </div>
-        <h1 className="text-xl sm:text-2xl font-serif font-bold text-[#F7EFD9]">
+        <h1 className="text-xl sm:text-2xl font-serif font-bold text-[var(--text-primary)]">
           {mode === 'enrol' ? 'Set Up Authenticator' : 'Two-Factor Authentication'}
         </h1>
-        <p className="text-xs text-[#F7EFD9]/60">
+        <p className="text-sm text-[var(--text-body-muted)]">
           {mode === 'enrol'
             ? 'Scan the QR code with your authenticator app (e.g. Google Authenticator).'
             : 'Enter the 6-digit code from your authenticator app.'}
@@ -138,19 +141,19 @@ export function MfaForm() {
       {error && (
         <div
           role="alert"
-          className="p-3.5 rounded-lg bg-[#B3261E]/20 border border-[#B3261E]/60 text-white flex items-center gap-2.5 text-xs sm:text-sm font-medium"
+          className="p-3.5 rounded-lg bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] text-[var(--status-danger-text)] flex items-center gap-2.5 text-sm font-medium"
         >
-          <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+          <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Enrollment QR Code Display */}
       {mode === 'enrol' && (
-        <div className="space-y-4 bg-[#0B0A09] p-4 rounded-xl border border-white/10 text-center">
+        <div className="space-y-4 bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-subtle-card)] text-center">
           {enrolling ? (
-            <div className="py-8 flex flex-col items-center justify-center gap-2 text-xs text-white/50">
-              <Loader2 className="w-6 h-6 animate-spin text-[#D4AF37]" />
+            <div className="py-8 flex flex-col items-center justify-center gap-2 text-sm text-[var(--text-body-muted)]">
+              <Loader2 className="w-6 h-6 animate-spin text-[var(--text-accent)]" />
               <span>Generating Secure Key...</span>
             </div>
           ) : qrCode ? (
@@ -158,21 +161,28 @@ export function MfaForm() {
               <div className="bg-white p-3 rounded-xl inline-block shadow-inner mx-auto">
                 {/* QR code rendered strictly as image source */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qrCode} alt="MFA Enrollment QR Code" className="w-44 h-44 mx-auto" />
+                <img src={qrCode} alt="MFA Enrollment QR Code" className="w-44 h-44 mx-auto" referrerPolicy="no-referrer" />
               </div>
 
               {secret && (
-                <div className="pt-2 text-left space-y-1">
-                  <span className="text-[11px] text-[#D4AF37] uppercase font-semibold">Manual Setup Key</span>
-                  <div className="flex items-center justify-between bg-[#17120F] px-3 py-2 rounded-lg border border-white/10 text-xs font-mono text-[#F7EFD9]">
-                    <span className="select-all tracking-wider">{secret}</span>
+                <div className="pt-2 text-left space-y-1.5">
+                  <span className="text-sm text-[var(--text-accent)] font-semibold block">
+                    Manual Setup Key
+                  </span>
+                  <div className="flex items-center justify-between gap-2 bg-[var(--bg-card)] px-3 py-1.5 rounded-lg border border-[var(--border-card)] text-sm font-mono text-[var(--text-primary)]">
+                    <span className="select-all tracking-wider break-all min-w-0">{secret}</span>
                     <button
                       type="button"
                       onClick={handleCopySecret}
-                      className="p-1 hover:text-[#D4AF37] transition-colors"
+                      aria-label={copied ? 'Setup key copied' : 'Copy manual setup key'}
+                      className="min-w-[44px] min-h-[44px] shrink-0 inline-flex items-center justify-center rounded-lg hover:text-[var(--text-accent)] transition-colors"
                       title="Copy Key"
                     >
-                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied ? (
+                        <Check className="w-4 h-4 text-[var(--text-money-positive)]" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -185,11 +195,14 @@ export function MfaForm() {
       {/* Verification Code Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="mfa-code" className="block text-xs font-semibold text-[#D4AF37] mb-1.5 uppercase tracking-wider">
+          <label
+            htmlFor="mfa-code"
+            className="block text-sm font-semibold text-[var(--text-accent)] mb-1.5 tracking-wide"
+          >
             6-Digit Security Code
           </label>
           <div className="relative">
-            <KeyRound className="w-4 h-4 text-white/40 absolute left-3.5 top-3" />
+            <KeyRound className="w-4 h-4 text-[var(--text-body-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="mfa-code"
               name="code"
@@ -202,7 +215,7 @@ export function MfaForm() {
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               placeholder="123456"
-              className="w-full bg-[#0B0A09] border border-white/15 focus:border-[#D4AF37] rounded-xl pl-10 pr-3 py-2.5 text-center text-xl sm:text-lg tracking-[0.3em] font-mono font-bold text-[#F7EFD9] placeholder:text-white/20 focus:outline-none min-h-[44px]"
+              className="w-full min-h-[44px] bg-[var(--bg-primary)] border border-[var(--border-card)] focus:border-[var(--border-gold)] rounded-xl pl-10 pr-3 py-2.5 text-center text-xl tracking-[0.25em] font-mono font-bold text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             />
           </div>
         </div>
@@ -210,7 +223,7 @@ export function MfaForm() {
         <button
           type="submit"
           disabled={loading || code.length < 6}
-          className="w-full min-h-[44px] bg-[#6B1230] text-[#F7EFD9] hover:bg-[#82173B] border border-[#D4AF37]/50 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+          className="w-full min-h-[44px] bg-[#6B1230] text-[#F7EFD9] hover:bg-[#82173B] border border-[#D4AF37]/60 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
         >
           {loading ? (
             <>
@@ -227,11 +240,11 @@ export function MfaForm() {
         </button>
       </form>
 
-      <div className="border-t border-white/5 pt-3 text-center">
+      <div className="border-t border-[var(--border-subtle-card)] pt-3 text-center">
         <button
           type="button"
           onClick={() => router.push('/login')}
-          className="text-xs text-[#D4AF37] hover:underline hover:text-[#F3D98B]"
+          className="min-h-[44px] px-4 inline-flex items-center justify-center text-sm font-medium text-[var(--text-accent)] hover:underline"
         >
           &larr; Back to sign-in
         </button>

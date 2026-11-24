@@ -4,16 +4,21 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
-import { invoiceRepository, estimateRepository, invoiceLinksRepository } from '@/src/invoices/repository';
-import { requireRole, AuthorizationError, UserProfile } from '@/src/lib/auth/access';
-import { formatNaira } from '@/src/lib/money';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '../../../../src/auth/wiring';
+import { invoiceRepository, estimateRepository, invoiceLinksRepository } from '../../../../src/invoices/repository';
+import { requireRole, AuthorizationError, UserProfile } from '../../../../src/lib/auth/access';
+import { formatNaira } from '../../../../src/lib/money';
+import { maskCustomerPhone } from '../../../../src/lib/security';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   // 1. Authentication
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -30,13 +35,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
+
   const userProfile: UserProfile = {
     id: profile.id,
     role: profile.role,
     isActive: profile.isActive,
     fullName: profile.fullName,
     email: profile.email,
-    hasMfaVerified: sessionRes.session?.aal === 'aal2',
+    hasMfaVerified: hasVerifiedTotp,
   };
 
   try {
@@ -59,7 +66,11 @@ export async function GET(request: NextRequest) {
         publicRef: inv.publicRef,
         guests: estimate?.inputs?.guests || 0,
         customerName: estimate?.contactName || 'Valued Client',
-        customerPhone: estimate?.contactPhone || '',
+        customerPhone: maskCustomerPhone(
+          estimate?.contactPhone || '',
+          userProfile.role,
+          userProfile.hasMfaVerified
+        ),
         totalKobo: inv.totalKobo.toString(),
         formattedTotal: formatNaira(inv.totalKobo),
         depositKobo: inv.depositKobo.toString(),

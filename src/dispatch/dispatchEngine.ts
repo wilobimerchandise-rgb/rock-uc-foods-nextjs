@@ -116,8 +116,8 @@ export function createKitchenTicketForOrder(
     throw new Error(`Order '${orderId}' not found.`);
   }
 
-  if (order.status !== 'payment_confirmed' && order.status !== 'in_kitchen') {
-    throw new Error(`Cannot create kitchen ticket for order with status '${order.status}'. Order must be payment_confirmed.`);
+  if (order.status !== 'paid' && order.status !== 'payment_confirmed' && order.status !== 'in_kitchen') {
+    throw new Error(`Cannot create kitchen ticket for order with status '${order.status}'. Order must be payment_confirmed or paid.`);
   }
 
   const station = determineStationForOrder(order);
@@ -138,8 +138,8 @@ export function createKitchenTicketForOrder(
 
   kitchenTicketRepository.save(ticket);
 
-  // Advance order status to in_kitchen if still payment_confirmed
-  if (order.status === 'payment_confirmed') {
+  // Advance order status to in_kitchen if paid / payment_confirmed
+  if (order.status === 'paid' || order.status === 'payment_confirmed') {
     order.status = 'in_kitchen';
     order.updatedAt = new Date().toISOString();
     orderRepository.save(order);

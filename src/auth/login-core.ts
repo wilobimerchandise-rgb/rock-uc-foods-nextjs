@@ -34,6 +34,7 @@ export interface AuthPortSession {
   expires_at?: number;
   user: AuthPortUser;
   aal?: 'aal1' | 'aal2';
+  authChannel?: 'cookie' | 'in_memory';
 }
 
 export interface AuthPort {
@@ -148,6 +149,13 @@ export function parseCredentials(body: unknown): { email: string; password: stri
   };
 }
 
+export function parseRemember(body: unknown): boolean {
+  if (!body || typeof body !== 'object') {
+    return false;
+  }
+  return (body as Record<string, unknown>).remember === true;
+}
+
 export type LoginStep = 'done' | 'verify' | 'enrol';
 
 export interface LoginResult {
@@ -155,6 +163,7 @@ export interface LoginResult {
   role: UserRole;
   next: string;
   userId: string;
+  remember: boolean;
 }
 
 /**
@@ -162,6 +171,7 @@ export interface LoginResult {
  */
 export async function login(body: unknown, deps: LoginCoreDeps): Promise<LoginResult> {
   const credentials = parseCredentials(body);
+  const remember = parseRemember(body);
   const limiter = deps.rateLimit || checkRateLimit;
   const audit = deps.auditWriter || recordAudit;
 
@@ -241,6 +251,7 @@ export async function login(body: unknown, deps: LoginCoreDeps): Promise<LoginRe
       role: 'staff',
       next: credentials.next,
       userId: authUser.id,
+      remember,
     };
   }
 
@@ -255,6 +266,7 @@ export async function login(body: unknown, deps: LoginCoreDeps): Promise<LoginRe
     role: profile.role,
     next: credentials.next,
     userId: authUser.id,
+    remember,
   };
 }
 

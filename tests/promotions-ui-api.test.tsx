@@ -8,6 +8,7 @@ import {
   promoRepository,
   validateAndCalculatePromo,
   generateSalesReport,
+  parseReportDateBoundMs,
   sanitizeCsvCell,
   exportOrdersToCsv,
 } from '../src/promotions/promotionEngine';
@@ -119,6 +120,7 @@ describe('Phase 7: Promotions, Coupon Engine, Sales Reports & CSV Exports', () =
         status: 'payment_confirmed',
         policyVersion: 'v4.0',
         policyAcceptedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         items: [
@@ -147,6 +149,7 @@ describe('Phase 7: Promotions, Coupon Engine, Sales Reports & CSV Exports', () =
         status: 'delivered',
         policyVersion: 'v4.0',
         policyAcceptedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         items: [
@@ -215,6 +218,7 @@ describe('Phase 7: Promotions, Coupon Engine, Sales Reports & CSV Exports', () =
         status: 'payment_confirmed',
         policyVersion: 'v4.0',
         policyAcceptedAt: new Date().toISOString(),
+        expiresAt: '2026-10-30T17:00:00.000Z',
         createdAt: '2026-10-30T10:00:00.000Z',
         updatedAt: '2026-10-30T10:00:00.000Z',
         items: [],
@@ -230,7 +234,20 @@ describe('Phase 7: Promotions, Coupon Engine, Sales Reports & CSV Exports', () =
   });
 
   describe('4. Order Checkout with Promo Code Integration', () => {
-    it('creates order with promoCodeId and deducts discount from totalKobo', () => {
+    it('creates order with promoCodeId and recomputes discount server-side into totalKobo', () => {
+      promoRepository.save({
+        id: 'promo-10',
+        code: 'SAVE500',
+        discountType: 'fixed_amount',
+        discountValue: 50000n,
+        minOrderKobo: 200000n,
+        startDate: new Date(Date.now() - 3600000).toISOString(),
+        endDate: new Date(Date.now() + 86400000).toISOString(),
+        isActive: true,
+        usedCount: 0,
+        createdAt: new Date().toISOString(),
+      });
+
       const order = createOrder({
         customerName: 'Obi Test',
         customerPhone: '08033729125',
@@ -238,7 +255,6 @@ describe('Phase 7: Promotions, Coupon Engine, Sales Reports & CSV Exports', () =
         acceptedPolicy: true,
         policyVersion: POLICY_VERSION,
         promoCodeId: 'promo-10',
-        discountKobo: 50000n, // ₦500.00 discount
         items: [
           {
             menuItemId: 'item-t001',
@@ -253,6 +269,60 @@ describe('Phase 7: Promotions, Coupon Engine, Sales Reports & CSV Exports', () =
       // Total = 350,000 - 50,000 = 300,000 kobo (₦3,000.00)
       expect(order.totalKobo).toBe(300000n);
       expect(order.promoCodeId).toBe('promo-10');
+    });
+
+    it('sums discountKobo into totalDiscountsKobo and normalizes YYYY-MM-DD filter bounds to Africa/Lagos (+01:00)', () => {
+      // 2026-10-21 23:30 Lagos === 2026-10-21T22:30:00.000Z (included in 2026-10-21)
+      orderRepository.save({
+        id: 'ord-disc-lagos',
+        orderCode: 'ROC-261021-DISC1',
+        customerName: 'Tolu Lagos',
+        customerPhone: '+2348033729125',
+        deliveryType: 'collection',
+        deliveryFeeKobo: 0n,
+        subtotalKobo: 500000n,
+        discountKobo: 75000n,
+        totalKobo: 425000n,
+        status: 'payment_confirmed',
+        policyVersion: 'v4.0',
+        policyAcceptedAt: '2026-10-21T22:30:00.000Z',
+        expiresAt: '2026-10-22T05:30:00.000Z',
+        createdAt: '2026-10-21T22:30:00.000Z',
+        updatedAt: '2026-10-21T22:30:00.000Z',
+        items: [],
+      });
+
+      // 2026-10-22 00:05 Lagos === 2026-10-21T23:05:00.000Z (excluded from 2026-10-21)
+      orderRepository.save({
+        id: 'ord-next-lagos-day',
+        orderCode: 'ROC-261022-NEXT1',
+        customerName: 'Amaka NextDay',
+        customerPhone: '+2348033729125',
+        deliveryType: 'collection',
+        deliveryFeeKobo: 0n,
+        subtotalKobo: 400000n,
+        discountKobo: 25000n,
+        totalKobo: 375000n,
+        status: 'payment_confirmed',
+        policyVersion: 'v4.0',
+        policyAcceptedAt: '2026-10-21T23:05:00.000Z',
+        expiresAt: '2026-10-22T06:05:00.000Z',
+        createdAt: '2026-10-21T23:05:00.000Z',
+        updatedAt: '2026-10-21T23:05:00.000Z',
+        items: [],
+      });
+
+      expect(parseReportDateBoundMs('2026-10-21', 'start')).toBe(
+        new Date('2026-10-21T00:00:00.000+01:00').getTime()
+      );
+      expect(parseReportDateBoundMs('2026-10-21', 'end')).toBe(
+        new Date('2026-10-21T23:59:59.999+01:00').getTime()
+      );
+
+      const oct21Report = generateSalesReport('2026-10-21', '2026-10-21');
+      expect(oct21Report.totalOrders).toBe(1);
+      expect(oct21Report.totalDiscountsKobo).toBe(75000n);
+      expect(oct21Report.netRevenueKobo).toBe(425000n);
     });
   });
 });

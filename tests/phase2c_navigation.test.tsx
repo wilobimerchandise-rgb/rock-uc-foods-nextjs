@@ -5,7 +5,7 @@
  * Rules verified:
  * 1. Bottom tab bar on phones (<768px) with icon + word on EVERY button.
  * 2. Every touch target >= 56px high, >= 64px wide, >= 8px gap.
- * 3. Icon 24px, label >= 13px, semibold, single line, <= 10 characters.
+ * 3. Icon 24px, label >= 14px, semibold, single line, <= 10 characters.
  * 4. Active item has wine background (#6B1230), cream text (#F7EFD9), aria-current="page".
  * 5. Inactive items have gold (#D4AF37) text, contrast >= 4.5:1, visible focus ring.
  * 6. Top header on phones is slim (<= 64px), crest ~40px, name on ONE line, NO nav buttons on phones.
@@ -60,7 +60,7 @@ describe('Phase 2C (Section 30): Mobile Navigation & Route Hardening', () => {
       expect(html).toContain('Track');
     });
 
-    it('every label is one word, <= 10 characters, font size >= 13px, semibold, single line', () => {
+    it('every label is one word, <= 10 characters, font size >= 14px, semibold, single line', () => {
       const allItems = [...BASE_NAV_ITEMS, ADMIN_NAV_ITEM];
       for (const item of allItems) {
         expect(item.label.length).toBeLessThanOrEqual(10);
@@ -71,8 +71,8 @@ describe('Phase 2C (Section 30): Mobile Navigation & Route Hardening', () => {
         <BottomTabBar activeTab="home" onSelectTab={() => {}} showAdmin={true} />
       );
 
-      // Verify text size class text-[13px], whitespace-nowrap
-      expect(html).toContain('text-[13px]');
+      // Verify text size class text-[14px], whitespace-nowrap
+      expect(html).toContain('text-[14px]');
       expect(html).toContain('whitespace-nowrap');
     });
 

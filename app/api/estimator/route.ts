@@ -3,12 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getEstimatorConfig,
   serializeEstimatorConfig,
-  deserializeEstimatorConfig,
 } from '@/src/estimator/config';
 import { computeEstimate } from '@/src/estimator/compute';
 import { updateEstimatorConfig, ConcurrencyError, ValidationError } from '@/src/estimator/editor';
 import { formatNaira } from '@/src/lib/money';
 import { estimateRepository } from '@/src/invoices/repository';
+import { isSameOrigin } from '@/src/lib/same-origin';
+import { resolveActiveAdminProfile } from '@/src/order/orderAuth';
+import { requireRole, AuthorizationError } from '@/src/lib/auth/access';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
     );
 
     const estimateId = `est-${crypto.randomUUID()}`;
-    const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days validity
+    const validUntil = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(); // 48 hours validity (Finding 5)
 
     estimateRepository.save({
       id: estimateId,
@@ -116,14 +120,37 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json(
+      { error: 'Cross-origin or missing origin requests are forbidden.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
+  const adminRes = await resolveActiveAdminProfile(req);
+  if ('error' in adminRes) {
+    return NextResponse.json(
+      { error: adminRes.error },
+      { status: adminRes.status, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
   try {
+    const actor = requireRole(
+      ['owner'],
+      adminRes.userProfile,
+      'update catering estimator pricing config',
+      'estimator_config',
+      { requireSecondFactor: true }
+    );
+
     const body = await req.json();
-    const { expectedVersion, updatedBy, tiers, addOns, serviceRates } = body;
+    const { expectedVersion, tiers, addOns, serviceRates } = body;
 
     if (typeof expectedVersion !== 'number') {
       return NextResponse.json(
         { error: 'expectedVersion number is required.' },
-        { status: 400 }
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
@@ -150,7 +177,7 @@ export async function PUT(req: NextRequest) {
     if (!serviceRates || typeof serviceRates !== 'object') {
       return NextResponse.json(
         { error: 'serviceRates object is required.' },
-        { status: 400 }
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
@@ -160,27 +187,41 @@ export async function PUT(req: NextRequest) {
       minDepositBps: Number(serviceRates.minDepositBps || 0),
     };
 
+    const authoritativeUpdater = actor.email || actor.id;
     const updated = updateEstimatorConfig(
       expectedVersion,
-      updatedBy || 'owner@rockucfoods.com',
+      authoritativeUpdater,
       parsedTiers,
       parsedAddOns,
       parsedServiceRates
     );
 
-    return NextResponse.json({
-      config: serializeEstimatorConfig(updated),
-    });
+    return NextResponse.json(
+      { config: serializeEstimatorConfig(updated) },
+      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (err: any) {
+    if (err instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
     if (err instanceof ConcurrencyError || err?.name === 'ConcurrencyError') {
-      return NextResponse.json({ error: err.message }, { status: 409 });
+      return NextResponse.json(
+        { error: err.message },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
     if (err instanceof ValidationError || err?.name === 'ValidationError') {
-      return NextResponse.json({ error: err.message }, { status: 400 });
+      return NextResponse.json(
+        { error: err.message },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
     return NextResponse.json(
       { error: err.message || 'Failed to update config.' },
-      { status: 500 }
+      { status: 400, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }

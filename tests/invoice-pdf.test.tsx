@@ -159,4 +159,73 @@ describe('Playbook Section 22: Invoice PDF Margin & Font Verification', () => {
       /exceeds maximum allowed limit/
     );
   });
+
+  it('4. Renders ₦ glyph without NGN or placeholder boxes, and enforces fail-closed vs verified GTBank details', async () => {
+    const { PDFParse } = require('pdf-parse');
+    const { resetBusinessSettings, setBusinessBankSettings } = await import(
+      '../src/lib/businessSettings'
+    );
+
+    const ownerActor = {
+      id: 'usr-owner-01',
+      role: 'owner' as const,
+      isActive: true,
+      fullName: 'Esther Kwentua',
+      hasMfaVerified: true,
+    };
+
+    try {
+      setBusinessBankSettings(null, ownerActor);
+
+      const baseData: InvoicePdfData = {
+        invoiceNumber: 'INV-2026-GTB-CHECK',
+        clientName: 'Chief Adebayo (EVT-20261019-MXTF)',
+        clientPhone: '+2348033729125',
+        eventDate: '2026-11-15',
+        items: [
+          {
+            name: 'Premium Party Jollof & Proteins (150 guests)',
+            quantity: 1,
+            unitPriceKobo: 495000000n,
+          },
+        ],
+        deliveryFeeKobo: 5000000n,
+        serviceChargeKobo: 10000000n,
+      };
+
+      // Unverified -> fail-closed
+      const failClosedBuf = await renderInvoicePdfBuffer(baseData);
+      const parser1 = new (PDFParse as any)({ data: Buffer.from(failClosedBuf) });
+      await parser1.load();
+      const text1 = (await parser1.getText()).text;
+      expect(text1).toContain('₦');
+      expect(text1).toContain('5,100,000.00');
+      expect(text1).toContain('3,570,000.00');
+      expect(text1).toContain('1,530,000.00');
+      expect(text1).not.toContain('NGN');
+      expect(text1).not.toContain('■');
+      expect(text1).toContain('Payment details will be sent by ROCK UC FOODS.');
+
+      // Verified GTBank passed directly
+      const verifiedBuf = await renderInvoicePdfBuffer({
+        ...baseData,
+        bankDetails: {
+          bankName: 'Guaranty Trust Bank (GTBank)',
+          accountName: 'Esther Kwentua',
+          accountNumber: '0013190627',
+          verifiedByOwner: true,
+        },
+      });
+      const parser2 = new (PDFParse as any)({ data: Buffer.from(verifiedBuf) });
+      await parser2.load();
+      const text2 = (await parser2.getText()).text;
+      expect(text2).toContain('Guaranty Trust Bank (GTBank)');
+      expect(text2).toContain('0013190627');
+      expect(text2).toContain('Esther Kwentua');
+      expect(text2).not.toContain('NGN');
+      expect(text2).not.toContain('■');
+    } finally {
+      resetBusinessSettings();
+    }
+  });
 });

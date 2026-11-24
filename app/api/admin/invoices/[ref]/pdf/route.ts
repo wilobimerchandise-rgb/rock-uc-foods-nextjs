@@ -4,7 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '@/src/auth/wiring';
 import { invoiceRepository, estimateRepository } from '@/src/invoices/repository';
 import { renderInvoicePdfBuffer, InvoicePdfData } from '@/src/lib/pdf/InvoiceDocument';
 import { requireRole, AuthorizationError, UserProfile } from '@/src/lib/auth/access';
@@ -18,7 +22,7 @@ export async function GET(
   const { ref } = await params;
 
   // 1. Authentication
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -35,9 +39,7 @@ export async function GET(
     );
   }
 
-  const hasVerifiedTotp =
-    (user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ?? false) ||
-    sessionRes.session?.aal === 'aal2';
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
 
   const userProfile: UserProfile = {
     id: profile.id,
@@ -70,6 +72,30 @@ export async function GET(
     }
 
     const estimate = estimateRepository.getById(invoice.estimateId);
+    const linesSumKobo = invoice.lines.reduce(
+      (sum, l) => sum + BigInt(l.unitPriceKobo) * BigInt(l.quantity),
+      0n
+    );
+    const estDeliveryKobo = estimate?.result?.logisticsKobo
+      ? BigInt(estimate.result.logisticsKobo)
+      : 0n;
+    const estServiceKobo = estimate?.result?.serviceChargeKobo
+      ? BigInt(estimate.result.serviceChargeKobo)
+      : 0n;
+
+    let deliveryFeeKobo = estDeliveryKobo;
+    let serviceChargeKobo = estServiceKobo;
+    if (linesSumKobo + deliveryFeeKobo + serviceChargeKobo !== invoice.totalKobo) {
+      const remaining = invoice.totalKobo - linesSumKobo;
+      if (remaining >= 0n) {
+        deliveryFeeKobo = remaining >= estDeliveryKobo ? estDeliveryKobo : remaining;
+        serviceChargeKobo = remaining - deliveryFeeKobo;
+      } else {
+        deliveryFeeKobo = 0n;
+        serviceChargeKobo = 0n;
+      }
+    }
+
     const pdfData: InvoicePdfData = {
       invoiceNumber: invoice.publicRef,
       revision: invoice.revision,
@@ -81,8 +107,8 @@ export async function GET(
         quantity: l.quantity,
         unitPriceKobo: BigInt(l.unitPriceKobo),
       })),
-      deliveryFeeKobo: 5000000n, // ₦50,000 logistics
-      serviceChargeKobo: invoice.totalKobo - invoice.depositKobo,
+      deliveryFeeKobo,
+      serviceChargeKobo,
     };
 
     const pdfBuffer = await renderInvoicePdfBuffer(pdfData);

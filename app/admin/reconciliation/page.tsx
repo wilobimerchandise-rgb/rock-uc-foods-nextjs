@@ -7,10 +7,10 @@ export const metadata: Metadata = privateMetadata;
 
 export default function AdminReconciliationPage() {
   return (
-    <main className="min-h-screen bg-[#0B0A09] text-[#F7EFD9] p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="w-full min-w-0 max-w-full py-2">
+      <div className="max-w-6xl mx-auto min-w-0">
         <ReconciliationManager />
       </div>
-    </main>
+    </div>
   );
 }

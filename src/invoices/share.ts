@@ -21,13 +21,17 @@ import { StoredInvoice, StoredInvoiceLink, InvoiceSharePayload } from './types';
 import { invoiceRepository, invoiceLinksRepository, estimateRepository } from './repository';
 import { requireRole, UserProfile } from '../lib/auth/access';
 import { formatNaira } from '../lib/money';
-import { checkRateLimit, RateLimitError } from '../lib/rate-limit';
+import { checkRateLimit, RateLimitError, RateLimitResult } from '../lib/rate-limit';
 import { recordAudit } from '../lib/audit';
+import { isWhatsappSendPaused, ServiceUnavailableError } from '../lib/operations';
+import { hasVerifiedBankSettings } from '../lib/businessSettings';
 
 export interface PrepareShareDeps {
   siteUrl?: string;
   nowMs?: number;
   randomTokenFn?: () => string;
+  checkRateLimitFn?: (key: string, limit?: number, windowMs?: number) => RateLimitResult;
+  requireVerifiedBankDetails?: boolean;
 }
 
 /**
@@ -141,6 +145,7 @@ export async function prepareInvoiceShare(
     siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rockucfoods.com',
     nowMs = Date.now(),
     randomTokenFn = () => crypto.randomBytes(32).toString('hex'),
+    checkRateLimitFn = checkRateLimit,
   } = deps;
 
   // 1. Authorize: Owner only with Second-Factor Rule (Staff & Developer get 403 and are audited)
@@ -148,10 +153,25 @@ export async function prepareInvoiceShare(
     requireSecondFactor: true,
   });
 
+  // 1b. Operational Kill Switch Check (Section 31.6)
+  if (isWhatsappSendPaused()) {
+    recordAudit({
+      action: 'ops.whatsapp_share_blocked_by_kill_switch',
+      entity: 'invoice',
+      entityId: publicRef,
+      actorId: actor.id,
+      actorRole: actor.role,
+      details: { publicRef },
+    });
+    throw new ServiceUnavailableError(
+      'WhatsApp invoice sending is temporarily paused via the operational kill switch.'
+    );
+  }
+
   // 2. Rate limit: 30 per 600s per user, key share:user:<id>, fails closed (429)
   try {
     const rateKey = `share:user:${actor.id}`;
-    const rateCheck = checkRateLimit(rateKey, 30, 600 * 1000);
+    const rateCheck = checkRateLimitFn(rateKey, 30, 600 * 1000);
     if (!rateCheck.allowed) {
       throw new RateLimitError('Rate limit exceeded. Maximum 30 shares per 10 minutes.');
     }
@@ -175,6 +195,24 @@ export async function prepareInvoiceShare(
     );
     (conflictErr as any).statusCode = 409;
     throw conflictErr;
+  }
+
+  // 4b. Finding 6: Require owner-verified bank details before sharing payment link
+  const checkBank = deps.requireVerifiedBankDetails !== false;
+  if (checkBank && !hasVerifiedBankSettings()) {
+    recordAudit({
+      action: 'invoice.share_blocked_no_bank_details',
+      entity: 'invoice',
+      entityId: invoice.id,
+      actorId: actor.id,
+      actorRole: actor.role,
+      details: { publicRef: invoice.publicRef },
+    });
+    const bankErr = new Error(
+      'Cannot share invoice without owner-verified bank details configured in Business Settings. Payment details will be sent by ROCK UC FOODS.'
+    );
+    (bankErr as any).statusCode = 409;
+    throw bankErr;
   }
 
   // 5. Mint a NEW 32-byte random token and SHA-256 hash

@@ -11,7 +11,7 @@
  * 6. Accessibility & Touch Target Dimensions (WCAG AA contrast, >=44px hitboxes, >=56px mobile bar)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -40,7 +40,7 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
 
   // ITEM 1: Real PostgreSQL Schema & Cross-Tenant Isolation
   describe('1. Real PostgreSQL Migrations & Multi-Role Isolation', () => {
-    it('applies all 17 migrations and audits RLS and role permissions on PGlite', async () => {
+    it('applies all migrations cleanly and audits RLS and role permissions on PGlite', async () => {
       const db = new PGlite();
       const migrationsDir = path.resolve(__dirname, '../supabase/migrations');
       const migrationFiles = fs
@@ -78,6 +78,8 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
 
       expect(tableNames).toContain('orders');
       expect(tableNames).toContain('order_items');
+      expect(tableNames).toContain('order_payment_proofs');
+      expect(tableNames).toContain('order_reopen_logs');
       expect(tableNames).toContain('invoices');
       expect(tableNames).toContain('receipts');
       expect(tableNames).toContain('audit_logs');
@@ -111,6 +113,7 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
         status: 'payment_confirmed',
         policyVersion: 'v2',
         policyAcceptedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         items: [],
@@ -129,6 +132,7 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
         status: 'payment_confirmed',
         policyVersion: 'v2',
         policyAcceptedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         items: [],
@@ -153,20 +157,20 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
     });
   });
 
-  // ITEM 2: Secret Scan
+  // ITEM 2: Secret Scan & Zero Legacy Payment Gateway Check
   describe('2. Client Bundle & Repository Secret Scan', () => {
-    it('ensures no service-role keys or private payment secrets appear in client-accessible code', () => {
-      const srcDir = path.resolve(__dirname, '../src');
+    it('ensures no service-role keys, payment secrets, ENABLE_PAYSTACK, or KILL_SWITCH_* remain in app/src', () => {
+      const scanDirs = [path.resolve(__dirname, '../src'), path.resolve(__dirname, '../app')];
 
       const checkFileForSecrets = (filePath: string) => {
         const content = fs.readFileSync(filePath, 'utf-8');
-        // Ban raw Paystack secret keys in source files
         expect(content).not.toMatch(/sk_live_[0-9a-zA-Z]{32,}/);
         expect(content).not.toMatch(/sk_test_[0-9a-zA-Z]{32,}/);
-        // Ban hardcoded service role secret assignments in client code
+        expect(content).not.toContain('ENABLE_PAYSTACK');
+        expect(content).not.toContain('PAYSTACK_SECRET_KEY');
+        expect(content).not.toContain('KILL_SWITCH_');
         if (filePath.includes('/components/')) {
           expect(content).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
-          expect(content).not.toContain('PAYSTACK_SECRET_KEY');
         }
       };
 
@@ -182,7 +186,7 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
         }
       };
 
-      walkDir(srcDir);
+      for (const dir of scanDirs) walkDir(dir);
     });
   });
 
@@ -222,16 +226,16 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
     });
 
     it('suppresses internal stack traces from error logs in production', () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
+      try {
+        const error = new Error('Database connection failed at pg_connect (/var/internal/db.ts:42:15)');
+        const entry = logError('Transaction error', error);
 
-      const error = new Error('Database connection failed at pg_connect (/var/internal/db.ts:42:15)');
-      const entry = logError('Transaction error', error);
-
-      expect(entry.error).not.toContain('/var/internal/db.ts');
-      expect(entry.error).toBe('Database connection failed at pg_connect');
-
-      process.env.NODE_ENV = originalEnv;
+        expect(entry.error).not.toContain('/var/internal/db.ts');
+        expect(entry.error).toBe('Database connection failed at pg_connect');
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
   });
 
@@ -365,6 +369,7 @@ describe('Phase 8 (Section 13): Production Readiness & Launch Gate', () => {
           status: 'payment_confirmed',
           policyVersion: 'v2',
           policyAcceptedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 7 * 3600 * 1000).toISOString(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           items: [],

@@ -1,10 +1,18 @@
 /**
  * ROCK UC FOODS - Server-Authoritative Ordering Engine
- * (Playbook v2 Section 8 & Section 17 v3 Addendum)
- * Prevents client price tampering, enforces integer kobo arithmetic,
- * normalizes Nigerian telephone contacts, and enforces mandatory policy consent.
+ * (Playbook v2 Section 8, Section 17 v3 Addendum & Manual GTBank Transfer Flow)
+ *
+ * Security & Money Rules:
+ * - Zero client trust: subtotal, delivery fee, promo discount, and total are computed
+ *   strictly on the server in BigInt integer kobo.
+ * - Server-generated random, non-sequential payment reference (RUC-XXXXXX).
+ * - CSPRNG 128-bit trackingToken bound to customer ownership.
+ * - Checkout blocked if bank details are missing/unverified:
+ *   "Payment details unavailable, contact us on 08033729125"
+ * - Unpaid orders expire automatically after 7 hours.
  */
 
+import crypto from 'crypto';
 import { CreateOrderInput, Order, OrderItemSnapshot } from '../types/order';
 import { menuRepository } from '../menu/data';
 import { calculateDeliveryFeeKobo } from './deliveryZones';
@@ -12,6 +20,28 @@ import { normalizeNigerianPhone } from '../lib/security';
 import { validatePolicyConsent } from '../policy/consent';
 import { orderRepository } from './orderRepository';
 import { getOrderablePrice } from '../menu/pricing';
+import {
+  hasVerifiedBankSettings,
+  MISSING_BANK_DETAILS_CHECKOUT_MESSAGE,
+} from '../lib/businessSettings';
+import { promoRepository, validateAndCalculatePromo } from '../promotions/promotionEngine';
+
+/**
+ * Unpaid orders expire after 7 hours.
+ */
+export const ORDER_EXPIRY_HOURS = 7;
+export const ORDER_EXPIRY_MS = ORDER_EXPIRY_HOURS * 60 * 60 * 1000;
+
+const REF_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+function randomChars(length: number): string {
+  const bytes = crypto.randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += REF_ALPHABET[bytes[i] % REF_ALPHABET.length];
+  }
+  return out;
+}
 
 /**
  * Generates collision-resistant, non-sequential order tracking codes.
@@ -22,18 +52,33 @@ export function generateOrderCode(): string {
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, '0');
   const day = String(now.getUTCDate()).padStart(2, '0');
-  const dateStr = `${year}${month}${day}`;
+  return `RUC-${year}${month}${day}-${randomChars(4)}`;
+}
 
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // base32 without easily confused 0/O, 1/I
-  let randomSuffix = '';
-  for (let i = 0; i < 4; i++) {
-    randomSuffix += chars[Math.floor(Math.random() * chars.length)];
+/**
+ * Generates a unique, non-sequential 6-character transfer narration reference (e.g. RUC-9K4M2P)
+ * using CSPRNG crypto.randomBytes.
+ */
+export function generatePaymentReference(): string {
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const candidate = `RUC-${randomChars(6)}`;
+    if (!orderRepository.hasPaymentReference(candidate)) {
+      return candidate;
+    }
   }
+  return `RUC-${crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6)}`;
+}
 
-  return `RUC-${dateStr}-${randomSuffix}`;
+export function generateOrderTrackingToken(): string {
+  return crypto.randomBytes(16).toString('hex');
 }
 
 export function validateAndCalculateOrder(input: CreateOrderInput): Order {
+  // 0. Ensure official bank transfer details are configured & verified before accepting orders
+  if (!hasVerifiedBankSettings()) {
+    throw new Error(MISSING_BANK_DETAILS_CHECKOUT_MESSAGE);
+  }
+
   // 1. Mandatory Policy Consent Verification
   validatePolicyConsent({
     acceptedPolicy: input.acceptedPolicy,
@@ -65,7 +110,7 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
     throw new Error('Cart limit exceeded. Maximum 30 distinct menu items per order.');
   }
 
-  const orderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const orderId = `ord-${crypto.randomUUID()}`;
   let subtotalKobo = 0n;
   const snapshotItems: OrderItemSnapshot[] = [];
 
@@ -119,19 +164,32 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
     throw new Error('Order subtotal must be greater than zero.');
   }
 
+  // 5. Server-side Promo Recalculation (NEVER accept client-supplied discountKobo or totalKobo)
   let discountKobo = 0n;
-  if (input.discountKobo && input.discountKobo > 0n) {
-    discountKobo = input.discountKobo > subtotalKobo ? subtotalKobo : input.discountKobo;
+  let resolvedPromoId: string | undefined = undefined;
+  const promoLookupCode =
+    input.promoCode?.trim() ||
+    (input.promoCodeId ? promoRepository.getById(input.promoCodeId)?.code : undefined);
+
+  if (promoLookupCode) {
+    const promoRes = validateAndCalculatePromo(promoLookupCode, subtotalKobo);
+    if (!promoRes.isValid) {
+      throw new Error(promoRes.reason || 'Invalid or expired promo code.');
+    }
+    discountKobo = promoRes.discountKobo > subtotalKobo ? subtotalKobo : promoRes.discountKobo;
+    resolvedPromoId = promoRes.promoCode?.id;
   }
 
   const totalKobo = (subtotalKobo - discountKobo) + deliveryFeeKobo;
   const now = new Date();
   const nowIso = now.toISOString();
-  const expiresAtIso = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+  const expiresAtIso = new Date(now.getTime() + ORDER_EXPIRY_MS).toISOString();
 
   const newOrder: Order = {
     id: orderId,
     orderCode: generateOrderCode(),
+    paymentReference: generatePaymentReference(),
+    trackingToken: generateOrderTrackingToken(),
     customerName: input.customerName.trim(),
     customerPhone: normalizedPhone,
     customerEmail: input.customerEmail ? input.customerEmail.trim() : undefined,
@@ -141,8 +199,9 @@ export function validateAndCalculateOrder(input: CreateOrderInput): Order {
     deliveryFeeKobo,
     subtotalKobo,
     discountKobo: discountKobo > 0n ? discountKobo : undefined,
-    promoCodeId: input.promoCodeId,
+    promoCodeId: resolvedPromoId,
     totalKobo,
+    paidAmountKobo: 0n,
     status: 'pending_payment',
     specialInstructions: input.specialInstructions ? input.specialInstructions.trim() : undefined,
     policyVersion: input.policyVersion,

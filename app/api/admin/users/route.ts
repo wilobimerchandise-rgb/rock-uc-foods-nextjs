@@ -6,7 +6,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isSameOrigin } from '@/src/lib/same-origin';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '@/src/auth/wiring';
 import { UserProfile } from '@/src/lib/auth/access';
 import { listStaffUsers, createStaffUser } from '@/src/auth/staff-service';
 
@@ -26,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 2. Auth Session & Profile
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -43,9 +47,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const hasVerifiedTotp =
-    (user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ?? false) ||
-    sessionRes.session?.aal === 'aal2';
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
 
   const actor: UserProfile = {
     id: profile.id,
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Auth Session & Profile
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -96,9 +98,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const hasVerifiedTotp =
-    (user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ?? false) ||
-    sessionRes.session?.aal === 'aal2';
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
 
   const actor: UserProfile = {
     id: profile.id,

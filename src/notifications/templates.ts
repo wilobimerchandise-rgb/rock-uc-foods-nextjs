@@ -9,6 +9,7 @@
  */
 
 import { formatNaira } from '../lib/money';
+import { getBusinessBankSettings, hasVerifiedBankSettings } from '../lib/businessSettings';
 import { Order } from '../types/order';
 import { Invoice, Receipt } from '../types/invoice';
 import { NotificationEventType } from '../types/notification';
@@ -109,8 +110,19 @@ export function renderCateringTemplate(
   let whatsAppText = '';
 
   if (eventType === 'catering_invoice_sent') {
+    const hasExplicitBankDetails =
+      'bankDetails' in invoice && invoice.bankDetails !== undefined;
+    const candidateBank = hasExplicitBankDetails
+      ? invoice.bankDetails
+      : getBusinessBankSettings();
+    const verifiedBank = hasVerifiedBankSettings(candidateBank) ? candidateBank : null;
+
+    const bankSection = verifiedBank
+      ? `🏦 *Official Bank Transfer Details:*\n• *Account Name:* ${verifiedBank.accountName}\n• *Account Number:* ${verifiedBank.accountNumber}\n• *Bank:* ${verifiedBank.bankName}`
+      : `🏦 *Payment Instructions:*\n• Payment details will be sent by ROCK UC FOODS.`;
+
     plainText = `ROCK UC FOODS: Dear ${clientFirstName}, your catering invoice #${invoice.invoiceNumber} (${grandTotalFormatted}) is ready. Upfront deposit: ${depositFormatted} (70%). Balance: ${balanceFormatted}. Details: ${invoiceUrl}`;
-    whatsAppText = `👑 *ROCK UC FOODS - Luxury Event Catering Invoice*\n\nDear *${clientFirstName}*,\n\nWe are delighted to present your official catering invoice *#${invoice.invoiceNumber}*.\n\n💰 *Total Investment:* ${grandTotalFormatted}\n💎 *70% Required Deposit:* ${depositFormatted}\n💳 *30% Delivery Balance:* ${balanceFormatted}\n\n🏦 *Payment Instructions (Moniepoint):*\n• *Account Name:* ROCK UC FOODS\n• *Account Number:* 6625890251\n• *Bank:* Moniepoint MFB\n\n📄 *Download Official PDF Invoice:* ${invoiceUrl}\n\n_Chef Esther & team look forward to hosting an unforgettable event._`;
+    whatsAppText = `👑 *ROCK UC FOODS - Luxury Event Catering Invoice*\n\nDear *${clientFirstName}*,\n\nWe are delighted to present your official catering invoice *#${invoice.invoiceNumber}*.\n\n💰 *Total Investment:* ${grandTotalFormatted}\n💎 *70% Required Deposit:* ${depositFormatted}\n💳 *30% Delivery Balance:* ${balanceFormatted}\n\n${bankSection}\n\n📄 *Download Official PDF Invoice:* ${invoiceUrl}\n\n_Chef Esther & team look forward to hosting an unforgettable event._`;
   } else {
     const amountReceived = receipt ? formatNaira(receipt.amountReceivedKobo) : depositFormatted;
     plainText = `ROCK UC FOODS: Official Receipt for invoice #${invoice.invoiceNumber}. Deposit of ${amountReceived} verified. Your event date is secured! Download: ${invoiceUrl}`;

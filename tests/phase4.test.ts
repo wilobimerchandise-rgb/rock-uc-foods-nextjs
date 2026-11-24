@@ -265,13 +265,64 @@ describe('Phase 4: Bulk Cancellation Refund Engine (Section 17.7 Compliance)', (
 });
 
 describe('Phase 4: Branded Official PDF Invoice Generation', () => {
-  it('Generates authentic PDF document containing event code, deposit schedule, and verbatim policy footer', async () => {
-    const event = cateringRepository.getAll()[0];
-    const quote = event.quotes[0];
+  it('Generates authentic PDF document with ₦ symbol (never NGN or placeholder boxes) and fail-closed/verified GTBank lines', async () => {
+    const { PDFParse } = require('pdf-parse');
+    const { resetBusinessSettings, setBusinessBankSettings } = await import(
+      '../src/lib/businessSettings'
+    );
 
-    const result = await generateCateringInvoicePdf(event, quote);
-    expect(result.pdfBytes).toBeDefined();
-    expect(result.pdfBytes.length).toBeGreaterThan(2000);
-    expect(result.filename).toBe(`ROCK_UC_FOODS_Invoice_${event.eventCode}_Rev${quote.revisionNumber}.pdf`);
+    const ownerActor = {
+      id: 'usr-owner-01',
+      role: 'owner' as const,
+      isActive: true,
+      fullName: 'Esther Kwentua',
+      hasMfaVerified: true,
+    };
+
+    try {
+      const event = cateringRepository.getAll()[0];
+      const quote = event.quotes[0];
+
+      // 1. Fail-closed when no verified bank details configured
+      setBusinessBankSettings(null, ownerActor);
+      const failClosedResult = await generateCateringInvoicePdf(event, quote);
+      expect(failClosedResult.pdfBytes).toBeDefined();
+      expect(failClosedResult.pdfBytes.length).toBeGreaterThan(2000);
+      expect(failClosedResult.filename).toBe(
+        `ROCK_UC_FOODS_Invoice_${event.eventCode}_Rev${quote.revisionNumber}.pdf`
+      );
+
+      const parser1 = new (PDFParse as any)({ data: Buffer.from(failClosedResult.pdfBytes) });
+      await parser1.load();
+      const parsed1 = await parser1.getText();
+      expect(parsed1.text).toContain('₦');
+      expect(parsed1.text).not.toContain('NGN');
+      expect(parsed1.text).not.toContain('■');
+      expect(parsed1.text).toContain('Payment details will be sent by ROCK UC FOODS.');
+
+      // 2. Verified GTBank details rendered once owner verifies
+      setBusinessBankSettings(
+        {
+          bankName: 'Guaranty Trust Bank (GTBank)',
+          accountName: 'Esther Kwentua',
+          accountNumber: '0013190627',
+          verifiedByOwner: true,
+        },
+        ownerActor
+      );
+
+      const verifiedResult = await generateCateringInvoicePdf(event, quote);
+      const parser2 = new (PDFParse as any)({ data: Buffer.from(verifiedResult.pdfBytes) });
+      await parser2.load();
+      const parsed2 = await parser2.getText();
+      expect(parsed2.text).toContain('₦');
+      expect(parsed2.text).not.toContain('NGN');
+      expect(parsed2.text).not.toContain('■');
+      expect(parsed2.text).toContain('Guaranty Trust Bank (GTBank)');
+      expect(parsed2.text).toContain('0013190627');
+      expect(parsed2.text).toContain('Esther Kwentua');
+    } finally {
+      resetBusinessSettings();
+    }
   });
 });

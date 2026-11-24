@@ -6,18 +6,7 @@ import { MessageCircle, Calculator, AlertTriangle, ShoppingBag } from 'lucide-re
 
 /**
  * ROCK UC FOODS - Phase 2B Dish Card Component
- * Playbook v9 Section 26.1 Item 3, 6, 7
- *
- * Rules:
- * - Semantic markup: article > photo button > h3 name + price > uppercase ingredient line
- *   > availability note > choice groups chips > size tiers > action buttons > allergen notice.
- * - Single setting in code for allergen notice position:
- *   'per-card' (as approved in live preview) or 'per-section'.
- * - Real wa.me link with dish name only in message (URL-encoded), never a price.
- * - 'Get a catering estimate' links to /estimate.
- * - Never '#' or 'javascript:'.
- * - Monogram tile fallback when no photo exists (never broken image).
- * - Visual steam and warm glow for showHeat = true. No audio ever.
+ * Playbook v9 Section 26.1 & Section 35 (Dark/Light tokens, >=14px text, >=44px targets)
  */
 
 export const ALLERGEN_NOTICE_DISPLAY: 'per-card' | 'per-section' = 'per-card';
@@ -62,7 +51,7 @@ export function DishCard({
       data-testid={`dish-card-${item.id}`}
       data-dish-id={item.id}
       data-show-heat={item.showHeat ? 'true' : 'false'}
-      className="dish-card relative bg-[#17120F] border border-[#D4AF37]/30 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-lg hover:border-[#D4AF37]/60 transition-all text-[#F7EFD9] min-w-0"
+      className="dish-card relative bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-lg hover:border-[var(--border-gold)] transition-all text-[var(--text-primary)] min-w-0"
     >
       {/* Top Section: Photo Tile on left, Title & Price on right */}
       <div className="flex items-start gap-4 min-w-0">
@@ -70,12 +59,10 @@ export function DishCard({
         <div className="relative shrink-0 w-24 h-24">
           {item.showHeat && (
             <>
-              {/* Radial warm glow behind photo tile */}
               <div
                 aria-hidden="true"
                 className="dish-heat-glow absolute inset-0 -m-1.5 rounded-xl bg-radial from-[#D4AF37]/35 via-[#6B1230]/25 to-transparent blur-sm pointer-events-none"
               />
-              {/* Three decorative rising steam wisps */}
               <div
                 aria-hidden="true"
                 className="dish-steam-container absolute -top-4 left-1/2 -translate-x-1/2 flex gap-1 pointer-events-none z-10"
@@ -91,7 +78,7 @@ export function DishCard({
             type="button"
             onClick={() => onEnlargePhoto?.(item)}
             aria-label={`Enlarge photo of ${item.name}`}
-            className="relative z-1 w-24 h-24 rounded-xl overflow-hidden border border-[#D4AF37]/40 bg-[#0B0A09] focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:ring-offset-2 focus:ring-offset-[#0B0A09] flex items-center justify-center group cursor-pointer"
+            className="relative z-1 w-24 h-24 min-w-[44px] min-h-[44px] rounded-xl overflow-hidden border border-[var(--border-gold)] bg-[#17120F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 flex items-center justify-center group cursor-pointer"
           >
             {item.photoUrl ? (
               <img
@@ -99,6 +86,7 @@ export function DishCard({
                 alt={`Photo of ${item.name}`}
                 width={96}
                 height={96}
+                referrerPolicy="no-referrer"
                 loading={isFirstScreen ? 'eager' : 'lazy'}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
@@ -107,7 +95,7 @@ export function DishCard({
                 <span className="font-serif font-bold text-2xl tracking-wider select-none">
                   {monogram}
                 </span>
-                <span className="text-[9px] uppercase tracking-widest text-[#F7EFD9]/50 mt-0.5">
+                <span className="text-sm uppercase tracking-wider text-[#F7EFD9] mt-0.5">
                   View
                 </span>
               </div>
@@ -118,51 +106,47 @@ export function DishCard({
         {/* Right Column: Name, Price, Ingredients, Availability */}
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
-            <h3 className="font-serif text-lg sm:text-xl font-bold text-[#F7EFD9] tracking-tight leading-snug">
+            <h3 className="font-serif text-lg sm:text-xl font-bold text-[var(--text-primary)] tracking-tight leading-snug">
               {item.name}
             </h3>
-            {/* Price on the same line (Inter font for figures & naira sign) */}
             {item.hasBasePrice && item.formattedBasePrice && (
-              <span className="font-sans font-bold text-base sm:text-lg text-[#D4AF37] shrink-0 whitespace-nowrap">
+              <span className="font-sans price-tabular font-bold text-base sm:text-lg text-[var(--text-accent)] shrink-0 whitespace-nowrap">
                 {item.formattedBasePrice}
               </span>
             )}
           </div>
 
-          {/* Uppercase ingredient / description line (CSS uppercase only, raw text preserved) */}
           {item.description && (
-            <p className="uppercase text-xs tracking-wider text-[#D4AF37]/90 leading-relaxed font-medium">
+            <p className="uppercase text-sm tracking-wide text-[var(--text-accent)] leading-relaxed font-medium">
               {item.description}
             </p>
           )}
 
-          {/* Availability Note */}
           {item.availabilityNote && (
-            <p className="text-xs text-[#F7EFD9]/75 italic flex items-center gap-1.5 pt-0.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
-              <span>{item.availabilityNote}</span>
+            <p className="text-sm text-[var(--text-body-muted)] italic pt-0.5">
+              {item.availabilityNote}
             </p>
           )}
         </div>
       </div>
 
-      {/* Choice Groups (Chips) */}
+      {/* Choice Groups */}
       {item.optionGroups && item.optionGroups.length > 0 && (
-        <div className="space-y-2 pt-1 border-t border-white/5">
+        <div className="space-y-2.5 pt-2 border-t border-[var(--border-subtle-card)]">
           {item.optionGroups.map((group) => (
-            <div key={group.id} className="space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#F7EFD9]/70">
+            <div key={group.id} className="space-y-1.5">
+              <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-primary)] block">
                 {group.title}
               </span>
-              <div className="flex flex-wrap gap-1.5" role="list">
+              <div className="flex flex-wrap gap-2" role="list">
                 {group.options.map((opt) => (
                   <span
                     key={opt.id}
                     role="listitem"
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-[#0B0A09] border border-[#D4AF37]/30 text-[#F7EFD9]/90"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm bg-[var(--bg-surface-muted)] border border-[var(--border-card)] text-[var(--text-primary)]"
                   >
                     <span>{opt.label}</span>
-                    <span className="text-[#D4AF37] font-semibold text-[11px]">
+                    <span className="text-[var(--text-accent)] font-semibold price-tabular">
                       ({opt.formattedExtra})
                     </span>
                   </span>
@@ -173,10 +157,10 @@ export function DishCard({
         </div>
       )}
 
-      {/* Size Tiers (e.g. S, M, L boxes for drinks) */}
+      {/* Size Tiers */}
       {item.sizeTiers && item.sizeTiers.length > 0 && (
-        <div className="space-y-1.5 pt-1 border-t border-white/5">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[#F7EFD9]/70">
+        <div className="space-y-2 pt-2 border-t border-[var(--border-subtle-card)]">
+          <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-primary)] block">
             Select Size &amp; Pricing
           </span>
           <div className="grid grid-cols-3 gap-2" role="list">
@@ -184,12 +168,12 @@ export function DishCard({
               <div
                 key={tier.id}
                 role="listitem"
-                className="flex flex-col items-center justify-center p-2 rounded-xl bg-[#0B0A09] border border-[#D4AF37]/40 text-center hover:border-[#D4AF37] transition-all"
+                className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-[var(--bg-surface-muted)] border border-[var(--border-card)] text-center hover:border-[var(--border-gold)] transition-all"
               >
-                <span className="text-xs font-bold text-[#F7EFD9] uppercase tracking-wide">
+                <span className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wide">
                   {tier.label}
                 </span>
-                <span className="font-sans font-bold text-xs text-[#D4AF37] mt-0.5 whitespace-nowrap">
+                <span className="font-sans price-tabular font-bold text-sm text-[var(--text-accent)] mt-0.5 whitespace-nowrap">
                   {tier.formattedPrice}
                 </span>
               </div>
@@ -199,38 +183,39 @@ export function DishCard({
       )}
 
       {/* Action Buttons */}
-      <div className="pt-2 flex flex-col gap-2">
+      <div className="pt-2 flex flex-col gap-2.5">
         {onOrder && (
           <button
             type="button"
             onClick={(e) => onOrder(item, e.currentTarget)}
-            className="w-full bg-gradient-to-r from-[#D4AF37] to-[#B08D26] hover:from-[#E5C158] hover:to-[#D4AF37] text-[#0B0A09] font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full min-h-[44px] bg-[var(--cta-gold-bg)] hover:bg-[var(--cta-gold-hover)] text-[var(--cta-gold-text)] font-bold text-sm py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
           >
-            <ShoppingBag className="w-4 h-4 text-[#0B0A09]" />
+            <ShoppingBag className="w-4 h-4 shrink-0" />
             <span>
-              {(item.optionGroups && item.optionGroups.length > 0) || (item.sizeTiers && item.sizeTiers.length > 0)
+              {(item.optionGroups && item.optionGroups.length > 0) ||
+              (item.sizeTiers && item.sizeTiers.length > 0)
                 ? 'Select Options & Order'
                 : 'Add to Order'}
             </span>
           </button>
         )}
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
           <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 bg-[#6B1230] hover:bg-[#85163C] text-[#F7EFD9] border border-[#D4AF37]/40 hover:border-[#D4AF37] px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 text-center"
+            className="flex-1 min-h-[44px] bg-[var(--cta-wine-bg)] hover:opacity-95 text-[var(--cta-wine-text)] border border-[var(--border-gold)] px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
           >
-            <MessageCircle className="w-4 h-4 text-[#D4AF37] shrink-0" />
+            <MessageCircle className="w-4 h-4 text-[var(--icon-on-wine)] shrink-0" />
             <span>Ask on WhatsApp</span>
           </a>
 
           <Link
             href="/estimate"
-            className="bg-[#0B0A09] hover:bg-[#1C1612] text-[#F7EFD9] border border-[#D4AF37]/30 hover:border-[#D4AF37] px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 text-center"
+            className="min-h-[44px] bg-[var(--bg-surface-muted)] hover:opacity-90 text-[var(--text-primary)] border border-[var(--border-card)] hover:border-[var(--border-gold)] px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
           >
-            <Calculator className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+            <Calculator className="w-4 h-4 text-[var(--icon-on-surface)] shrink-0" />
             <span>Get catering estimate</span>
           </Link>
         </div>
@@ -238,8 +223,8 @@ export function DishCard({
 
       {/* Verbatim Allergen Notice (Single Source of Truth) */}
       {showNotice && (
-        <div className="mt-1 p-2.5 rounded-lg bg-[#0B0A09]/70 border border-[#D4AF37]/20 flex items-start gap-2 text-[11px] text-[#F7EFD9]/70 leading-relaxed">
-          <AlertTriangle className="w-3.5 h-3.5 text-[#D4AF37] shrink-0 mt-0.5" />
+        <div className="mt-1 p-3 rounded-lg bg-[var(--bg-surface-muted)] border border-[var(--border-card)] flex items-start gap-2.5 text-sm text-[var(--text-body-muted)] leading-relaxed">
+          <AlertTriangle className="w-4 h-4 text-[var(--icon-on-surface)] shrink-0 mt-1" />
           <span>{ALLERGEN_NOTICE}</span>
         </div>
       )}

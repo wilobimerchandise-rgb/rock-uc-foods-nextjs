@@ -14,7 +14,6 @@ import { ContactFooter } from '../../src/components/brand/ContactFooter';
 import {
   MessageCircle,
   Calculator,
-  Phone,
   ShieldAlert,
   Clock,
   Truck,
@@ -40,10 +39,8 @@ export default function PublicMenuPage() {
   const categories = menuRepository.getCategories();
   const allItems = menuRepository.getItems();
 
-  // Phase 2B: Server-authoritative read model formatting options, tiers, and heat
   const formattedItems = getActiveMenuWithDetails(allItems);
 
-  // Filter valid published items for JSON-LD (base price or size tiers)
   const validItems = allItems.filter((i) => {
     return (
       i.status === 'published' &&
@@ -53,10 +50,9 @@ export default function PublicMenuPage() {
   });
 
   const whatsappPhone = (contact.whatsapp || '+2348033729125').replace(/\D/g, '');
-  const phoneTel = `tel:${(contact.phone || '08033729125').replace(/\s+/g, '')}`;
 
   return (
-    <div className="min-h-screen bg-[#0B0A09] text-[#F7EFD9] flex flex-col font-sans min-w-0 max-w-full">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col font-sans min-w-0 max-w-full">
       {/* Schema.org JSON-LD */}
       <script
         type="application/ld+json"
@@ -66,25 +62,28 @@ export default function PublicMenuPage() {
       />
 
       {/* Top Banner Navigation */}
-      <header className="border-b border-[#D4AF37]/30 bg-[#17120F]/90 backdrop-blur sticky top-0 z-40 px-4 py-3 min-w-0">
+      <header className="border-b border-[var(--border-gold)] bg-[var(--bg-header)] backdrop-blur sticky top-0 z-40 px-4 py-2 min-w-0">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="font-serif font-bold text-lg text-[#F7EFD9] tracking-wider">
+          <Link
+            href="/"
+            className="inline-flex items-center min-h-[44px] gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] rounded-lg px-1"
+          >
+            <span className="font-serif font-bold text-lg text-[var(--text-primary)] tracking-wider whitespace-nowrap">
               ROCK UC FOODS
             </span>
           </Link>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-sm shrink-0">
             <Link
               href="/catering"
-              className="hidden sm:inline-block hover:text-[#D4AF37] transition-colors"
+              className="hidden sm:inline-flex items-center min-h-[44px] px-2 font-medium text-[var(--text-primary)] hover:text-[var(--text-accent)] transition-colors whitespace-nowrap"
             >
               Catering &amp; Events
             </Link>
             <Link
               href="/estimate"
-              className="bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/50 px-3 py-1.5 rounded font-semibold hover:border-[#D4AF37] transition-all flex items-center gap-1.5"
+              className="min-h-[44px] bg-[var(--cta-wine-bg)] text-[var(--cta-wine-text)] border border-[var(--border-gold)] px-4 py-2 rounded-lg font-semibold hover:opacity-95 transition-all inline-flex items-center gap-1.5 whitespace-nowrap"
             >
-              <Calculator className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <Calculator className="w-4 h-4 text-[var(--icon-on-wine)] shrink-0" />
               <span>Get Estimate</span>
             </Link>
           </div>
@@ -93,42 +92,46 @@ export default function PublicMenuPage() {
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8 space-y-12 min-w-0">
         {/* Page Hero & Header */}
-        <div className="space-y-4 border-b border-white/10 pb-8">
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#F7EFD9] tracking-tight">
+        <div className="space-y-4 border-b border-[var(--border-card)] pb-8">
+          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[var(--text-primary)] tracking-tight">
             ROCK UC FOODS Menu &amp; Pricing
           </h1>
-          <p className="text-sm text-[#F7EFD9]/80 max-w-2xl leading-relaxed">
-            Authentic Nigerian party jollof, heritage soups, grilled meats, and bespoke feast packages. Cooked fresh to order in Lagos with premium ingredients.
+          <p className="text-base text-[var(--text-body-muted)] max-w-2xl leading-relaxed">
+            Authentic Nigerian party jollof, heritage soups, grilled meats, and bespoke feast
+            packages. Cooked fresh to order in Lagos with premium ingredients.
           </p>
 
           {/* Ordering Hours & 24/7 Notice */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-white/70 pt-2">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--text-body-muted)] pt-2">
             {hours.orderingOpen247 && (
-              <span className="inline-flex items-center gap-1.5 text-[#D4AF37] font-semibold bg-[#17120F] px-3 py-1 rounded-full border border-[#D4AF37]/30">
-                <Clock className="w-3.5 h-3.5" />
+              <span className="inline-flex items-center gap-2 text-[var(--text-accent)] font-semibold bg-[var(--bg-card)] px-3.5 py-1.5 rounded-lg border border-[var(--border-card)]">
+                <Clock className="w-4 h-4 shrink-0" />
                 Order requests are accepted any time
               </span>
             )}
             <span>
-              {hours.kitchenNote} ({hours.leadTimeHours}-hour minimum lead time applies to all orders).
+              {hours.kitchenNote} ({hours.leadTimeHours}-hour minimum lead time applies to all
+              orders).
             </span>
           </div>
 
           {/* Top Allergen Notice Banner */}
-          <div className="p-4 rounded-xl bg-[#17120F] border border-[#D4AF37]/30 flex items-start gap-3 mt-4">
-            <ShieldAlert className="w-5 h-5 text-[#D4AF37] shrink-0 mt-0.5" />
-            <div className="space-y-1 text-xs">
-              <span className="font-bold text-[#D4AF37] uppercase tracking-wider text-[11px]">
+          <div className="p-4 sm:p-5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-card)] flex items-start gap-3 mt-4">
+            <ShieldAlert className="w-5 h-5 text-[var(--icon-on-surface)] shrink-0 mt-0.5" />
+            <div className="space-y-1.5 text-sm">
+              <span className="font-bold text-[var(--text-accent)] uppercase tracking-wider block">
                 Allergen Notice
               </span>
-              <p className="text-white/80 leading-relaxed">
-                {ALLERGEN_NOTICE}
-              </p>
-              <p className="text-[11px] text-white/50 pt-1">
+              <p className="text-[var(--text-body-muted)] leading-relaxed">{ALLERGEN_NOTICE}</p>
+              <p className="text-sm text-[var(--text-body-muted)] pt-1">
                 View our complete cancellation terms at{' '}
-                <Link href="/terms" className="text-[#D4AF37] underline hover:text-[#F3D98B]">
-                  Terms &amp; Refund Policy
-                </Link>.
+                <Link
+                  href="/refund-policy"
+                  className="inline-flex items-center min-h-[44px] text-[var(--text-link)] font-semibold underline hover:opacity-85"
+                >
+                  Refund &amp; Cancellation Policy
+                </Link>
+                .
               </p>
             </div>
           </div>
@@ -136,21 +139,22 @@ export default function PublicMenuPage() {
 
         {/* Empty Menu State */}
         {formattedItems.length === 0 ? (
-          <div className="text-center py-16 bg-[#17120F] rounded-2xl border border-white/10 p-6 space-y-4 max-w-xl mx-auto">
-            <h2 className="text-xl font-serif font-bold text-[#F7EFD9]">
+          <div className="text-center py-16 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-card)] p-6 space-y-4 max-w-xl mx-auto">
+            <h2 className="text-xl font-serif font-bold text-[var(--text-primary)]">
               Our Menu is Currently Being Updated
             </h2>
-            <p className="text-xs text-white/70 leading-relaxed">
-              Chef Esther is crafting the next seasonal feast. To order directly or inquire about today&apos;s available fresh dishes, message us on WhatsApp.
+            <p className="text-sm text-[var(--text-body-muted)] leading-relaxed">
+              Chef Esther is crafting the next seasonal feast. To order directly or inquire about
+              today&apos;s available fresh dishes, message us on WhatsApp.
             </p>
             <div className="pt-2">
               <a
                 href={`https://wa.me/${whatsappPhone}?text=${encodeURIComponent('Hello Chef Esther, I would like to inquire about ordering food today.')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37] px-4 py-2.5 rounded-lg text-xs font-bold hover:scale-105 transition-all shadow-lg"
+                className="inline-flex items-center min-h-[44px] gap-2 bg-[var(--cta-wine-bg)] text-[var(--cta-wine-text)] border border-[var(--border-gold)] px-5 py-2.5 rounded-lg text-sm font-bold hover:opacity-95 transition-all shadow-lg"
               >
-                <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                <MessageCircle className="w-4 h-4 text-[var(--icon-on-wine)] shrink-0" />
                 <span>Inquire on WhatsApp ({contact.whatsapp})</span>
               </a>
             </div>
@@ -162,21 +166,23 @@ export default function PublicMenuPage() {
               const catItems = formattedItems.filter((i) => i.categoryId === cat.id);
               if (catItems.length === 0) return null;
 
-              // Find custom section name or fallback to category name
               const matchedSection = sections.find(
-                (s) => s.categorySlug.toLowerCase() === cat.name.toLowerCase() ||
-                       s.displayName.toLowerCase() === cat.name.toLowerCase()
+                (s) =>
+                  s.categorySlug.toLowerCase() === cat.name.toLowerCase() ||
+                  s.displayName.toLowerCase() === cat.name.toLowerCase()
               );
               const displayName = matchedSection ? matchedSection.displayName : cat.name;
-              const plainLabel = matchedSection ? matchedSection.plainLabel : `${cat.name} dishes and specials`;
+              const plainLabel = matchedSection
+                ? matchedSection.plainLabel
+                : `${cat.name} dishes and specials`;
 
               return (
                 <section key={cat.id} className="space-y-6">
-                  <div className="border-b border-[#D4AF37]/20 pb-2">
-                    <h2 className="font-serif text-2xl font-bold text-[#F7EFD9]">
+                  <div className="border-b border-[var(--border-card)] pb-2">
+                    <h2 className="font-serif text-2xl font-bold text-[var(--text-primary)]">
                       {displayName}
                     </h2>
-                    <span className="text-xs uppercase font-bold tracking-widest text-[#D4AF37]">
+                    <span className="text-sm uppercase font-bold tracking-widest text-[var(--text-accent)]">
                       {plainLabel}
                     </span>
                   </div>
@@ -189,32 +195,31 @@ export default function PublicMenuPage() {
         )}
 
         {/* Section 7: Delivery Areas & Fees */}
-        <section className="bg-[#17120F] border border-[#D4AF37]/30 rounded-2xl p-6 sm:p-8 space-y-4">
-          <div className="flex items-center gap-2 text-[#D4AF37]">
-            <Truck className="w-5 h-5" />
-            <h2 className="font-serif text-xl font-bold text-[#F7EFD9]">
+        <section className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-6 sm:p-8 space-y-4">
+          <div className="flex items-center gap-2 text-[var(--text-accent)]">
+            <Truck className="w-5 h-5 shrink-0" />
+            <h2 className="font-serif text-xl font-bold text-[var(--text-primary)]">
               Lagos Delivery Areas &amp; Rates
             </h2>
           </div>
-          <p className="text-xs text-white/70 leading-relaxed">
-            All orders are freshly prepared and dispatched directly from our Lagos kitchen in temperature-controlled packaging.
+          <p className="text-sm text-[var(--text-body-muted)] leading-relaxed">
+            All orders are freshly prepared and dispatched directly from our Lagos kitchen in
+            temperature-controlled packaging.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
             {LAGOS_DELIVERY_ZONES.filter((z) => z.isActive).map((zone) => (
               <div
                 key={zone.id}
-                className="bg-[#0B0A09] border border-white/10 p-3.5 rounded-xl space-y-1"
+                className="bg-[var(--bg-surface-muted)] border border-[var(--border-card)] p-4 rounded-xl space-y-1"
               >
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-[#F7EFD9]">{zone.name}</span>
-                  <span className="font-mono text-[#D4AF37] font-semibold">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="font-bold text-[var(--text-primary)]">{zone.name}</span>
+                  <span className="font-mono price-tabular text-[var(--text-accent)] font-semibold whitespace-nowrap">
                     {formatKobo(zone.feeKobo)}
                   </span>
                 </div>
-                <p className="text-[11px] text-white/50">
-                  {zone.areas.join(', ')}
-                </p>
+                <p className="text-sm text-[var(--text-body-muted)]">{zone.areas.join(', ')}</p>
               </div>
             ))}
           </div>
@@ -223,11 +228,11 @@ export default function PublicMenuPage() {
         {/* Section 9: Real Reviews (Rendered ONLY if permissionConfirmed reviews exist) */}
         {reviews.length > 0 && (
           <section className="space-y-4">
-            <div className="border-b border-[#D4AF37]/20 pb-2">
-              <h2 className="font-serif text-2xl font-bold text-[#F7EFD9]">
+            <div className="border-b border-[var(--border-card)] pb-2">
+              <h2 className="font-serif text-2xl font-bold text-[var(--text-primary)]">
                 Customer Testimonials
               </h2>
-              <span className="text-xs uppercase font-bold tracking-widest text-[#D4AF37]">
+              <span className="text-sm uppercase font-bold tracking-widest text-[var(--text-accent)]">
                 Verified Client Feedback
               </span>
             </div>
@@ -236,15 +241,15 @@ export default function PublicMenuPage() {
               {reviews.map((rev, idx) => (
                 <div
                   key={idx}
-                  className="bg-[#17120F] border border-white/10 rounded-xl p-5 space-y-3"
+                  className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-xl p-5 space-y-3"
                 >
-                  <Quote className="w-5 h-5 text-[#D4AF37]/50" />
-                  <p className="text-xs text-[#F7EFD9]/80 italic leading-relaxed">
+                  <Quote className="w-5 h-5 text-[var(--icon-on-surface)]" />
+                  <p className="text-sm text-[var(--text-primary)] italic leading-relaxed">
                     &ldquo;{rev.quote}&rdquo;
                   </p>
-                  <div className="text-[11px] text-[#D4AF37] font-semibold flex items-center justify-between">
+                  <div className="text-sm text-[var(--text-accent)] font-semibold flex items-center justify-between">
                     <span>{rev.name}</span>
-                    <span className="text-white/40">{rev.dateText}</span>
+                    <span className="text-[var(--text-body-muted)]">{rev.dateText}</span>
                   </div>
                 </div>
               ))}

@@ -2,28 +2,31 @@
 
 /**
  * ROCK UC FOODS - Rider Dispatch & Delivery Dashboard
- * Playbook v2 Section 13 / Phase 4 Dispatch
+ * Playbook v2 Section 13 / Phase 4 Dispatch & Section 35
  */
 
 import React, { useState, useEffect } from 'react';
 import {
   Truck,
   Package,
-  Phone,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
-  Search,
-  ExternalLink,
-  Send,
-  UserCheck,
-  ShieldAlert,
 } from 'lucide-react';
 import { DispatchAssignment } from '../../types/dispatch';
 import { Order } from '../../types/order';
 import { formatNaira } from '../../lib/money';
+import { maskCustomerPhone } from '../../lib/security';
 
-export function DispatchManagerDashboard() {
+interface DispatchManagerDashboardProps {
+  currentUserRole?: 'owner' | 'staff' | 'developer';
+  hasMfaVerified?: boolean;
+}
+
+export function DispatchManagerDashboard({
+  currentUserRole = 'staff',
+  hasMfaVerified = false,
+}: DispatchManagerDashboardProps = {}) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [assignments, setAssignments] = useState<DispatchAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,89 +153,106 @@ export function DispatchManagerDashboard() {
     }
   };
 
-  // Ready for dispatch or already in transit
   const readyOrders = orders.filter((o) => o.status === 'ready_for_dispatch');
   const inTransitOrders = orders.filter((o) => o.status === 'out_for_delivery');
   const deliveredOrders = orders.filter((o) => o.status === 'delivered');
 
   return (
-    <div className="space-y-6 text-[#F7EFD9]">
+    <div className="space-y-6 text-[var(--text-primary)] min-w-0 max-w-full">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center">
-              <Truck className="w-4 h-4 text-[#D4AF37]" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle-card)]">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center shrink-0">
+              <Truck className="w-5 h-5 text-[#D4AF37]" />
             </div>
-            <h2 className="text-xl md:text-2xl font-black text-[#F7EFD9] tracking-tight">
+            <h2 className="text-xl md:text-2xl font-black text-[var(--text-primary)] tracking-tight">
               Rider Dispatch &amp; Handover Hub
             </h2>
           </div>
-          <p className="text-xs text-[#F7EFD9]/60 mt-1">
+          <p className="text-sm text-[var(--text-body-muted)] mt-1">
             Dispatch fleet management, E.164 phone validation (+234...), and customer handover confirmation.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={fetchData}
           disabled={loading}
-          className="flex items-center space-x-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors shrink-0"
+          className="min-h-[44px] inline-flex items-center justify-center space-x-2 px-4 py-2 bg-[var(--bg-card)] hover:border-[var(--border-gold)] border border-[var(--border-card)] text-[var(--text-primary)] rounded-xl text-sm font-semibold transition-colors shrink-0"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 text-[var(--text-accent)] ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh Fleet</span>
         </button>
       </div>
 
       {errorMsg && (
-        <div className="p-3 bg-rose-950/60 border border-rose-500/50 rounded-xl text-xs text-rose-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div
+          role="alert"
+          className="p-3.5 bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] rounded-xl text-sm text-[var(--status-danger-text)] flex items-center gap-2"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {successMsg && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div
+          role="status"
+          className="p-3.5 bg-[var(--status-success-bg)] border border-[var(--status-success-border)] rounded-xl text-sm text-[var(--status-success-text)] flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-amber-950/40 border border-amber-500/30 rounded-2xl">
-          <span className="text-[11px] text-amber-400 font-semibold uppercase flex items-center gap-1.5">
-            <Package className="w-3.5 h-3.5" /> Packaged &amp; Awaiting Rider
+        <div className="p-4 bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] rounded-2xl">
+          <span className="text-sm text-[var(--status-warning-text)] font-semibold uppercase flex items-center gap-1.5">
+            <Package className="w-4 h-4 shrink-0" /> Packaged &amp; Awaiting Rider
           </span>
-          <div className="text-2xl font-black text-amber-200 mt-1">{readyOrders.length}</div>
-          <span className="text-[10px] text-amber-400/80">Thermal sealed boxes ready</span>
+          <div className="text-2xl font-black text-[var(--status-warning-text)] price-tabular mt-1">
+            {readyOrders.length}
+          </div>
+          <span className="text-sm text-[var(--status-warning-text)] opacity-90">
+            Thermal sealed boxes ready
+          </span>
         </div>
 
-        <div className="p-4 bg-sky-950/40 border border-sky-500/30 rounded-2xl">
-          <span className="text-[11px] text-sky-400 font-semibold uppercase flex items-center gap-1.5">
-            <Truck className="w-3.5 h-3.5" /> Out For Delivery (In Transit)
+        <div className="p-4 bg-[var(--status-info-bg)] border border-[var(--status-info-border)] rounded-2xl">
+          <span className="text-sm text-[var(--status-info-text)] font-semibold uppercase flex items-center gap-1.5">
+            <Truck className="w-4 h-4 shrink-0" /> Out For Delivery (In Transit)
           </span>
-          <div className="text-2xl font-black text-sky-200 mt-1">{inTransitOrders.length}</div>
-          <span className="text-[10px] text-sky-400/80">Riders on the road</span>
+          <div className="text-2xl font-black text-[var(--status-info-text)] price-tabular mt-1">
+            {inTransitOrders.length}
+          </div>
+          <span className="text-sm text-[var(--status-info-text)] opacity-90">
+            Riders on the road
+          </span>
         </div>
 
-        <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl">
-          <span className="text-[11px] text-emerald-400 font-semibold uppercase flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Successfully Delivered
+        <div className="p-4 bg-[var(--status-success-bg)] border border-[var(--status-success-border)] rounded-2xl">
+          <span className="text-sm text-[var(--status-success-text)] font-semibold uppercase flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0" /> Successfully Delivered
           </span>
-          <div className="text-2xl font-black text-emerald-200 mt-1">{deliveredOrders.length}</div>
-          <span className="text-[10px] text-emerald-400/80">Completed handovers</span>
+          <div className="text-2xl font-black text-[var(--status-success-text)] price-tabular mt-1">
+            {deliveredOrders.length}
+          </div>
+          <span className="text-sm text-[var(--status-success-text)] opacity-90">
+            Completed handovers
+          </span>
         </div>
       </div>
 
       {/* Section 1: Ready for Rider Assignment */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-          <span>Orders Awaiting Rider Handover ({readyOrders.length})</span>
+        <h3 className="text-base font-bold text-[var(--text-primary)]">
+          Orders Awaiting Rider Handover ({readyOrders.length})
         </h3>
 
         {readyOrders.length === 0 ? (
-          <div className="p-6 bg-[#17120F] border border-white/5 rounded-2xl text-center text-xs text-stone-400">
+          <div className="p-6 bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-2xl text-center text-sm text-[var(--text-body-muted)]">
             No orders currently waiting for rider assignment.
           </div>
         ) : (
@@ -240,32 +260,35 @@ export function DispatchManagerDashboard() {
             {readyOrders.map((order) => (
               <div
                 key={order.id}
-                className="p-5 bg-[#17120F] border border-amber-500/40 rounded-2xl space-y-3 flex flex-col justify-between"
+                className="p-5 bg-[var(--bg-card)] border border-[var(--status-warning-border)] rounded-2xl space-y-3 flex flex-col justify-between min-w-0"
               >
                 <div>
-                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                    <span className="font-mono text-xs font-bold text-[#D4AF37]">
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border-subtle-card)]">
+                    <span className="font-mono text-sm font-bold text-[var(--text-accent)]">
                       #{order.orderCode}
                     </span>
-                    <span className="text-xs font-bold text-white">
+                    <span className="text-sm font-bold text-[var(--text-primary)] font-mono price-tabular">
                       {formatNaira(order.totalKobo)}
                     </span>
                   </div>
 
-                  <div className="pt-2 text-xs text-stone-300 space-y-1">
-                    <div className="font-bold text-white">{order.customerName}</div>
-                    <div className="text-stone-400 text-[11px]">{order.deliveryAddress || 'Kitchen Pickup'}</div>
-                    <div className="text-stone-500 font-mono text-[10px]">
-                      Customer Phone: {order.customerPhone}
+                  <div className="pt-2 text-sm text-[var(--text-body-muted)] space-y-1">
+                    <div className="font-bold text-[var(--text-primary)]">{order.customerName}</div>
+                    <div className="text-sm text-[var(--text-body-muted)]">
+                      {order.deliveryAddress || 'Kitchen Pickup'}
+                    </div>
+                    <div className="text-[var(--text-body-muted)] font-mono price-tabular text-sm">
+                      Customer Phone: {maskCustomerPhone(order.customerPhone, currentUserRole, hasMfaVerified)}
                     </div>
                   </div>
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => setAssignModalOrder(order)}
-                  className="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-lg"
+                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-[#92400E] hover:bg-[#78350F] text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow"
                 >
-                  <Truck className="w-3.5 h-3.5" />
+                  <Truck className="w-4 h-4 shrink-0" />
                   <span>Assign Delivery Rider</span>
                 </button>
               </div>
@@ -275,14 +298,13 @@ export function DispatchManagerDashboard() {
       </div>
 
       {/* Section 2: Active In-Transit Deliveries */}
-      <div className="space-y-3 pt-4 border-t border-white/10">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
-          <span>In-Transit Deliveries ({inTransitOrders.length})</span>
+      <div className="space-y-3 pt-4 border-t border-[var(--border-subtle-card)]">
+        <h3 className="text-base font-bold text-[var(--text-primary)]">
+          In-Transit Deliveries ({inTransitOrders.length})
         </h3>
 
         {inTransitOrders.length === 0 ? (
-          <div className="p-6 bg-[#17120F] border border-white/5 rounded-2xl text-center text-xs text-stone-400">
+          <div className="p-6 bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-2xl text-center text-sm text-[var(--text-body-muted)]">
             No riders currently on the road.
           </div>
         ) : (
@@ -293,52 +315,56 @@ export function DispatchManagerDashboard() {
               return (
                 <div
                   key={order.id}
-                  className="p-5 bg-sky-950/20 border border-sky-500/40 rounded-2xl space-y-3 flex flex-col justify-between"
+                  className="p-5 bg-[var(--bg-card)] border border-[var(--status-info-border)] rounded-2xl space-y-3 flex flex-col justify-between min-w-0"
                 >
                   <div>
-                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                      <div>
-                        <span className="font-mono text-xs font-bold text-sky-300 block">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border-subtle-card)]">
+                      <div className="min-w-0">
+                        <span className="font-mono text-sm font-bold text-[var(--status-info-text)] block">
                           #{order.orderCode}
                         </span>
-                        <span className="text-[10px] text-stone-400">{order.customerName}</span>
+                        <span className="text-sm text-[var(--text-body-muted)]">
+                          {order.customerName}
+                        </span>
                       </div>
-                      <span className="text-xs font-bold text-white font-mono">
+                      <span className="text-sm font-bold text-[var(--text-primary)] font-mono price-tabular shrink-0">
                         {formatNaira(order.totalKobo)}
                       </span>
                     </div>
 
-                    <div className="pt-2 text-xs space-y-1.5">
-                      <div className="p-2.5 bg-black/40 rounded-xl border border-white/5">
-                        <span className="text-[10px] text-stone-400 uppercase font-bold block mb-1">
+                    <div className="pt-2 text-sm space-y-2">
+                      <div className="p-3 bg-[var(--bg-surface-muted)] rounded-xl border border-[var(--border-subtle-card)]">
+                        <span className="text-sm text-[var(--text-body-muted)] uppercase font-bold block mb-1">
                           Dispatched Rider
                         </span>
-                        <div className="text-white font-bold flex items-center justify-between">
+                        <div className="text-[var(--text-primary)] font-bold flex items-center justify-between gap-2">
                           <span>{assignment ? assignment.riderName : 'Dispatched Fleet'}</span>
                           {assignment?.riderVehiclePlate && (
-                            <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono text-[#D4AF37]">
+                            <span className="text-sm bg-[var(--bg-card)] px-2 py-0.5 rounded font-mono text-[var(--text-accent)] border border-[var(--border-card)]">
                               {assignment.riderVehiclePlate}
                             </span>
                           )}
                         </div>
                         {assignment && (
-                          <div className="text-[11px] text-sky-400 font-mono mt-0.5">
+                          <div className="text-sm text-[var(--status-info-text)] font-mono price-tabular mt-0.5">
                             {assignment.riderPhone}
                           </div>
                         )}
                       </div>
 
-                      <div className="text-[11px] text-stone-300">
-                        <span className="text-stone-500">Destination:</span> {order.deliveryAddress}
+                      <div className="text-sm text-[var(--text-body-muted)]">
+                        <span className="font-semibold text-[var(--text-primary)]">Destination:</span>{' '}
+                        {order.deliveryAddress}
                       </div>
                     </div>
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => handleConfirmDelivery(order.id)}
-                    className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-lg"
+                    className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-[#166534] hover:bg-[#14532D] text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>Confirm Handover &amp; Delivery</span>
                   </button>
                 </div>
@@ -350,59 +376,73 @@ export function DispatchManagerDashboard() {
 
       {/* Rider Assignment Modal */}
       {assignModalOrder && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#17120F] border border-[#D4AF37]/60 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assign-rider-modal-title"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle-card)]">
               <div>
-                <h4 className="text-base font-bold text-white">Assign Delivery Rider</h4>
-                <p className="text-xs text-stone-400 font-mono">Order #{assignModalOrder.orderCode}</p>
+                <h4 id="assign-rider-modal-title" className="text-base font-bold text-[var(--text-primary)]">
+                  Assign Delivery Rider
+                </h4>
+                <p className="text-sm text-[var(--text-body-muted)] font-mono">
+                  Order #{assignModalOrder.orderCode}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setAssignModalOrder(null)}
-                className="text-stone-400 hover:text-white text-xs"
+                className="min-h-[44px] px-3 rounded-lg text-sm font-semibold text-[var(--text-body-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]"
               >
                 Cancel
               </button>
             </div>
 
-            <form onSubmit={handleAssignRider} className="space-y-3.5 text-xs">
+            <form onSubmit={handleAssignRider} className="space-y-4 text-sm">
               <div>
-                <label className="block text-stone-300 font-semibold mb-1">Rider Full Name</label>
+                <label htmlFor="dispatch-rider-name" className="block text-[var(--text-primary)] font-semibold mb-1.5">
+                  Rider Full Name
+                </label>
                 <input
+                  id="dispatch-rider-name"
                   type="text"
                   required
                   placeholder="e.g. Babatunde Lawal"
                   value={riderName}
                   onChange={(e) => setRiderName(e.target.value)}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-xl text-white placeholder-stone-600 focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--border-gold)]"
                 />
               </div>
 
               <div>
-                <label className="block text-stone-300 font-semibold mb-1">
-                  Rider Phone Number <span className="text-stone-400">(Nigerian 080... or +234...)</span>
+                <label htmlFor="dispatch-rider-phone" className="block text-[var(--text-primary)] font-semibold mb-1.5">
+                  Rider Phone Number <span className="text-[var(--text-body-muted)]">(080... or +234...)</span>
                 </label>
                 <input
+                  id="dispatch-rider-phone"
                   type="tel"
                   required
                   placeholder="08033729125 or +2348033729125"
                   value={riderPhone}
                   onChange={(e) => setRiderPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-xl text-white placeholder-stone-600 focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--border-gold)]"
                 />
               </div>
 
               <div>
-                <label className="block text-stone-300 font-semibold mb-1">
-                  Vehicle / Bike Plate Number <span className="text-stone-500">(Optional)</span>
+                <label htmlFor="dispatch-rider-plate" className="block text-[var(--text-primary)] font-semibold mb-1.5">
+                  Vehicle / Bike Plate Number <span className="text-[var(--text-body-muted)]">(Optional)</span>
                 </label>
                 <input
+                  id="dispatch-rider-plate"
                   type="text"
                   placeholder="e.g. KJA-482-XA"
                   value={riderPlate}
                   onChange={(e) => setRiderPlate(e.target.value)}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-xl text-white placeholder-stone-600 focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--border-gold)]"
                 />
               </div>
 
@@ -410,14 +450,14 @@ export function DispatchManagerDashboard() {
                 <button
                   type="button"
                   onClick={() => setAssignModalOrder(null)}
-                  className="px-4 py-2 rounded-xl text-stone-400 hover:text-white"
+                  className="min-h-[44px] px-4 py-2 rounded-xl border border-[var(--border-subtle-card)] text-sm font-semibold text-[var(--text-body-muted)] hover:text-[var(--text-primary)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 rounded-xl bg-[#6B1230] hover:bg-[#85163c] text-white border border-[#D4AF37] font-bold shadow-lg transition-colors"
+                  className="min-h-[44px] px-5 py-2 rounded-xl bg-[#6B1230] hover:bg-[#85163c] text-[#F7EFD9] border border-[#D4AF37] font-bold text-sm shadow transition-colors"
                 >
                   {submitting ? 'Dispatching...' : 'Confirm Dispatch'}
                 </button>

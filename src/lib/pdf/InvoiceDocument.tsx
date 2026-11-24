@@ -24,6 +24,7 @@ import {
 import { registerPdfFonts } from './fonts';
 import { MoneyCell } from './Money';
 import { MAX_KOBO, lineTotal, splitDeposit, formatNaira } from '../money';
+import { getBusinessBankSettings, hasVerifiedBankSettings } from '../businessSettings';
 import { INVOICE_FOOTER, ALLERGEN_NOTICE, BUSINESS_CONTACT } from '../../policy/content';
 
 export interface InvoicePdfItem {
@@ -42,6 +43,12 @@ export interface InvoicePdfData {
   items: InvoicePdfItem[];
   deliveryFeeKobo?: bigint;
   serviceChargeKobo?: bigint;
+  bankDetails?: {
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
+    verifiedByOwner?: boolean;
+  } | null;
 }
 
 const COLOR_WINE = '#6B1230';
@@ -228,6 +235,14 @@ export const InvoiceDocument: React.FC<{ data: InvoicePdfData }> = ({ data }) =>
 
   const { depositKobo, balanceKobo } = splitDeposit(totalKobo, 7000);
 
+  const bankCandidate =
+    data && 'bankDetails' in data && data.bankDetails !== undefined
+      ? data.bankDetails
+        ? { ...data.bankDetails, verifiedByOwner: data.bankDetails.verifiedByOwner ?? true }
+        : null
+      : getBusinessBankSettings();
+  const bankReady = Boolean(bankCandidate && hasVerifiedBankSettings(bankCandidate));
+
   return (
     <Document title={`Invoice ${data.invoiceNumber}`}>
       <Page size="A4" style={styles.page}>
@@ -354,6 +369,31 @@ export const InvoiceDocument: React.FC<{ data: InvoicePdfData }> = ({ data }) =>
               <MoneyCell amountKobo={balanceKobo} width={140} color={COLOR_MUTED} maxFontSize={9} />
             </View>
           </View>
+        </View>
+
+        {/* Payment Instructions (Verified GTBank only, fails closed otherwise) */}
+        <View
+          style={{
+            backgroundColor: '#F8F6F0',
+            borderWidth: 1,
+            borderColor: '#E5E0D8',
+            borderRadius: 3,
+            padding: 8,
+            marginBottom: 10,
+          }}
+        >
+          <Text style={{ fontSize: 8, fontWeight: 'bold', color: COLOR_WINE, marginBottom: 2 }}>
+            OFFICIAL PAYMENT INSTRUCTIONS
+          </Text>
+          {bankReady && bankCandidate ? (
+            <Text style={{ fontSize: 8, color: COLOR_INK, lineHeight: 1.35 }}>
+              {`Bank: ${bankCandidate.bankName}  |  Account No: ${bankCandidate.accountNumber}  |  Account Name: ${bankCandidate.accountName}  |  Ref: ${data.invoiceNumber}`}
+            </Text>
+          ) : (
+            <Text style={{ fontSize: 8, color: COLOR_MUTED, lineHeight: 1.35 }}>
+              Payment details will be sent by ROCK UC FOODS.
+            </Text>
+          )}
         </View>
 
         {/* Policy & Allergen Footers */}

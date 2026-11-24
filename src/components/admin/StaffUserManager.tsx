@@ -2,14 +2,7 @@
 
 /**
  * ROCK UC FOODS - Staff User Management Screen (Phase 1E)
- * Playbook v2 Section 6 (Phase 1), Section 9 (Phase 4), Section 28.4 (Phase 1E)
- * 
- * Rules:
- * - Owner ONLY with Second-Factor MFA.
- * - Manage staff, developer, and owner accounts.
- * - Self-deactivation prevention for the active owner.
- * - Lost-phone recovery via Reset MFA.
- * - Mobile-first layout with 44px+ touch targets, dark brand luxury styling.
+ * Playbook v2 Section 6 (Phase 1), Section 9 (Phase 4), Section 28.4 (Phase 1E), Section 35
  */
 
 import React, { useState, useEffect } from 'react';
@@ -32,7 +25,7 @@ import {
   User,
   Info,
 } from 'lucide-react';
-import { PublicStaffUser } from '@/src/auth/staff-service';
+import { PublicStaffUser } from '../../auth/staff-service';
 
 interface StaffUserManagerProps {
   currentUserRole?: string;
@@ -40,7 +33,6 @@ interface StaffUserManagerProps {
 }
 
 export function StaffUserManager({
-  currentUserRole = 'owner',
   currentUserId = '',
 }: StaffUserManagerProps) {
   const [users, setUsers] = useState<PublicStaffUser[]>([]);
@@ -65,6 +57,17 @@ export function StaffUserManager({
   const [passwordTargetUser, setPasswordTargetUser] = useState<PublicStaffUser | null>(null);
   const [newPassword, setNewPassword] = useState('NewSecret2026!');
   const [submittingPassword, setSubmittingPassword] = useState(false);
+
+  // Confirmation modal state (replaces window.confirm for iframe & Section 35 safety)
+  const [pendingConfirmAction, setPendingConfirmAction] = useState<{
+    type: 'toggle_active' | 'reset_mfa';
+    user: PublicStaffUser;
+    nextState?: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    isDanger: boolean;
+  } | null>(null);
 
   // Action Loading states per user ID
   const [actionInProgress, setActionInProgress] = useState<Record<string, boolean>>({});
@@ -98,77 +101,81 @@ export function StaffUserManager({
     };
   }, []);
 
-  async function handleToggleActive(user: PublicStaffUser) {
+  function handleToggleActive(user: PublicStaffUser) {
     if (user.id === currentUserId) {
       setErrorMsg('You cannot deactivate your own owner account.');
       return;
     }
 
     const nextState = !user.isActive;
-    const confirmText = nextState
-      ? `Reactivate account for ${user.fullName}?`
-      : `Deactivate ${user.fullName}? They will be immediately signed out and lose access.`;
-
-    if (!window.confirm(confirmText)) return;
-
-    setActionInProgress((prev) => ({ ...prev, [user.id]: true }));
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    try {
-      const res = await fetch(`/api/admin/users/${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'toggle_active',
-          isActive: nextState,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update account status.');
-      }
-
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? data.user : u))
-      );
-      setSuccessMsg(
-        nextState
-          ? `Account for ${user.fullName} successfully reactivated.`
-          : `Account for ${user.fullName} deactivated. Access revoked immediately.`
-      );
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Operation failed.');
-    } finally {
-      setActionInProgress((prev) => ({ ...prev, [user.id]: false }));
-    }
+    setPendingConfirmAction({
+      type: 'toggle_active',
+      user,
+      nextState,
+      title: nextState ? 'Reactivate Team Member' : 'Deactivate Team Member',
+      message: nextState
+        ? `Reactivate account for ${user.fullName}? They will regain access immediately.`
+        : `Deactivate ${user.fullName}? They will be immediately signed out and lose access.`,
+      confirmLabel: nextState ? 'Reactivate Account' : 'Deactivate Account',
+      isDanger: !nextState,
+    });
   }
 
-  async function handleResetMfa(user: PublicStaffUser) {
-    const confirmText = `Reset MFA for ${user.fullName}? This removes their registered authenticator app and requires re-enrollment on their next sign-in (use this for lost phones).`;
-    if (!window.confirm(confirmText)) return;
+  function handleResetMfa(user: PublicStaffUser) {
+    setPendingConfirmAction({
+      type: 'reset_mfa',
+      user,
+      title: 'Reset Authenticator (MFA)',
+      message: `Reset MFA for ${user.fullName}? This removes their registered authenticator app and requires re-enrollment on their next sign-in (use this for lost phones).`,
+      confirmLabel: 'Clear MFA Factors',
+      isDanger: true,
+    });
+  }
 
+  async function executeConfirmedAction() {
+    if (!pendingConfirmAction) return;
+    const { type, user, nextState } = pendingConfirmAction;
+    setPendingConfirmAction(null);
     setActionInProgress((prev) => ({ ...prev, [user.id]: true }));
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
+      const payload =
+        type === 'toggle_active'
+          ? { action: 'toggle_active', isActive: nextState }
+          : { action: 'reset_mfa' };
+
       const res = await fetch(`/api/admin/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset_mfa' }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to reset MFA.');
+        throw new Error(
+          data.error ||
+            (type === 'toggle_active'
+              ? 'Failed to update account status.'
+              : 'Failed to reset MFA.')
+        );
       }
 
       setUsers((prev) =>
         prev.map((u) => (u.id === user.id ? data.user : u))
       );
-      setSuccessMsg(`MFA factors for ${user.fullName} have been cleared.`);
+
+      if (type === 'toggle_active') {
+        setSuccessMsg(
+          nextState
+            ? `Account for ${user.fullName} successfully reactivated.`
+            : `Account for ${user.fullName} deactivated. Access revoked immediately.`
+        );
+      } else {
+        setSuccessMsg(`MFA factors for ${user.fullName} have been cleared.`);
+      }
     } catch (err: any) {
-      setErrorMsg(err.message || 'MFA reset failed.');
+      setErrorMsg(err.message || 'Operation failed.');
     } finally {
       setActionInProgress((prev) => ({ ...prev, [user.id]: false }));
     }
@@ -255,33 +262,34 @@ export function StaffUserManager({
   });
 
   return (
-    <div className="space-y-6 max-w-full">
+    <div className="space-y-6 max-w-full min-w-0 text-[var(--text-primary)]">
       {/* Header Banner */}
-      <div className="bg-[#17120F] border border-[#D4AF37]/30 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#6B1230]/40 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-xl bg-[#6B1230] border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] shrink-0">
               <Users className="w-6 h-6" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#F7EFD9] tracking-tight">
-                  Staff & User Management
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] tracking-tight">
+                  Staff &amp; User Management
                 </h1>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40 uppercase tracking-widest">
+                <span className="text-sm font-bold px-2.5 py-0.5 rounded-md bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/40 uppercase tracking-wider">
                   Phase 1E
                 </span>
               </div>
-              <p className="text-xs text-[#F7EFD9]/60 mt-1">
+              <p className="text-sm text-[var(--text-body-muted)] mt-1">
                 Owner-only directory for team accounts, role-based access, and lost-phone authenticator recovery.
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={() => setShowAddModal(true)}
             data-testid="add-staff-button"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#6B1230] hover:bg-[#80183b] text-[#F7EFD9] border border-[#D4AF37]/60 font-semibold text-xs tracking-wide shadow-lg transition-all min-h-[44px]"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#6B1230] hover:bg-[#80183b] text-[#F7EFD9] border border-[#D4AF37]/60 font-semibold text-sm tracking-wide shadow-lg transition-all min-h-[44px] shrink-0"
           >
             <UserPlus className="w-4 h-4 text-[#D4AF37]" />
             <span>Add Team Member</span>
@@ -293,15 +301,17 @@ export function StaffUserManager({
       {errorMsg && (
         <div
           role="alert"
-          className="p-4 rounded-xl bg-red-950/60 border border-red-500/50 text-red-200 text-xs flex items-center justify-between gap-3 shadow-lg"
+          className="p-4 rounded-xl bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] text-[var(--status-danger-text)] text-sm flex items-center justify-between gap-3 shadow-lg"
         >
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
           <button
+            type="button"
+            aria-label="Dismiss error"
             onClick={() => setErrorMsg(null)}
-            className="p-1 rounded hover:bg-white/10 text-red-300"
+            className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg hover:bg-black/10"
           >
             <X className="w-4 h-4" />
           </button>
@@ -311,15 +321,17 @@ export function StaffUserManager({
       {successMsg && (
         <div
           role="status"
-          className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-200 text-xs flex items-center justify-between gap-3 shadow-lg"
+          className="p-4 rounded-xl bg-[var(--status-success-bg)] border border-[var(--status-success-border)] text-[var(--status-success-text)] text-sm flex items-center justify-between gap-3 shadow-lg"
         >
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle className="w-4 h-4 shrink-0" />
             <span>{successMsg}</span>
           </div>
           <button
+            type="button"
+            aria-label="Dismiss status message"
             onClick={() => setSuccessMsg(null)}
-            className="p-1 rounded hover:bg-white/10 text-emerald-300"
+            className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg hover:bg-black/10"
           >
             <X className="w-4 h-4" />
           </button>
@@ -327,60 +339,65 @@ export function StaffUserManager({
       )}
 
       {/* Filter and Search Bar */}
-      <div className="bg-[#17120F] border border-white/10 rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+      <div className="bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-0">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-body-muted)] pointer-events-none" />
           <input
             type="text"
+            aria-label="Search team members"
             placeholder="Search by name or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-[#0B0A09] border border-white/10 rounded-lg text-xs text-[#F7EFD9] placeholder:text-white/30 focus:outline-none focus:border-[#D4AF37]"
+            className="w-full min-h-[44px] pl-10 pr-4 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--border-gold)]"
           />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-[#0B0A09] px-2.5 py-1.5 rounded-lg border border-white/10">
-            <Filter className="w-3.5 h-3.5 text-[#D4AF37]" />
+          <div className="flex items-center gap-1.5 bg-[var(--bg-primary)] px-3 rounded-lg border border-[var(--border-card)] min-h-[44px]">
+            <Filter className="w-4 h-4 text-[var(--text-accent)] shrink-0" />
             <select
+              aria-label="Filter by role"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as any)}
-              className="bg-transparent text-xs text-[#F7EFD9] focus:outline-none cursor-pointer"
+              className="min-h-[44px] bg-transparent text-sm text-[var(--text-primary)] focus:outline-none cursor-pointer"
             >
-              <option value="all" className="bg-[#0B0A09]">All Roles</option>
-              <option value="owner" className="bg-[#0B0A09]">Owner</option>
-              <option value="staff" className="bg-[#0B0A09]">Staff</option>
-              <option value="developer" className="bg-[#0B0A09]">Developer</option>
+              <option value="all">All Roles</option>
+              <option value="owner">Owner</option>
+              <option value="staff">Staff</option>
+              <option value="developer">Developer</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-[#0B0A09] px-2.5 py-1.5 rounded-lg border border-white/10">
+          <div className="flex items-center gap-1.5 bg-[var(--bg-primary)] px-3 rounded-lg border border-[var(--border-card)] min-h-[44px]">
             <select
+              aria-label="Filter by status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-transparent text-xs text-[#F7EFD9] focus:outline-none cursor-pointer"
+              className="min-h-[44px] bg-transparent text-sm text-[var(--text-primary)] focus:outline-none cursor-pointer"
             >
-              <option value="all" className="bg-[#0B0A09]">All Statuses</option>
-              <option value="active" className="bg-[#0B0A09]">Active Only</option>
-              <option value="deactivated" className="bg-[#0B0A09]">Deactivated</option>
+              <option value="all">All Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="deactivated">Deactivated</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* Users List */}
-      <div className="bg-[#17120F] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-2xl overflow-hidden shadow-xl">
         {loading ? (
-          <div className="p-12 text-center text-[#F7EFD9]/40 text-xs animate-pulse">
+          <div className="p-12 text-center text-[var(--text-body-muted)] text-sm">
             Loading team directory...
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="p-12 text-center space-y-2">
-            <Users className="w-8 h-8 text-white/20 mx-auto" />
-            <p className="text-xs text-white/50">No team members match your filters.</p>
+            <Users className="w-8 h-8 text-[var(--text-body-muted)] mx-auto" />
+            <p className="text-sm text-[var(--text-body-muted)]">
+              No team members match your filters.
+            </p>
           </div>
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-[var(--border-subtle-card)]">
             {filteredUsers.map((u) => {
               const isCurrentUser = u.id === currentUserId;
               const isOwner = u.role === 'owner';
@@ -391,47 +408,43 @@ export function StaffUserManager({
                 <div
                   key={u.id}
                   className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
-                    !u.isActive ? 'bg-[#0B0A09]/60 opacity-75' : 'hover:bg-white/[0.02]'
+                    !u.isActive ? 'bg-[var(--bg-surface-muted)] opacity-80' : ''
                   }`}
                   data-testid={`user-row-${u.id}`}
                 >
                   {/* Left: User Details */}
                   <div className="flex items-start sm:items-center gap-3 min-w-0">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
                         isOwner
-                          ? 'bg-[#D4AF37]/10 border-[#D4AF37]/50 text-[#D4AF37]'
+                          ? 'bg-[var(--bg-surface-muted)] border-[var(--border-gold)] text-[var(--text-accent)]'
                           : isDev
-                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                          : 'bg-[#6B1230]/20 border-[#6B1230]/50 text-[#F7EFD9]'
+                          ? 'bg-[var(--status-success-bg)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                          : 'bg-[#6B1230] border-[#D4AF37]/40 text-[#F7EFD9]'
                       }`}
                     >
-                      {isOwner ? (
-                        <ShieldCheck className="w-5 h-5" />
-                      ) : (
-                        <User className="w-5 h-5" />
-                      )}
+                      {isOwner ? <ShieldCheck className="w-5 h-5" /> : <User className="w-5 h-5" />}
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-[#F7EFD9] truncate">
+                        <span className="font-semibold text-base text-[var(--text-primary)] truncate">
                           {u.fullName}
                         </span>
                         {isCurrentUser && (
-                          <span className="text-[10px] bg-white/10 text-white/70 px-1.5 py-0.2 rounded font-mono">
+                          <span className="text-sm bg-[var(--bg-surface-muted)] text-[var(--text-body-muted)] px-2 py-0.5 rounded font-mono">
                             (You)
                           </span>
                         )}
 
                         {/* Role Badge */}
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                          className={`text-sm font-bold px-2.5 py-0.5 rounded-md border uppercase tracking-wider ${
                             isOwner
-                              ? 'bg-[#D4AF37]/20 border-[#D4AF37]/60 text-[#D4AF37]'
+                              ? 'bg-[#6B1230] border-[#D4AF37]/60 text-[#F7EFD9]'
                               : isDev
-                              ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
-                              : 'bg-purple-950/60 border-purple-500/50 text-purple-300'
+                              ? 'bg-[var(--status-success-bg)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                              : 'bg-[var(--status-info-bg)] border-[var(--status-info-border)] text-[var(--status-info-text)]'
                           }`}
                         >
                           {u.role}
@@ -439,32 +452,34 @@ export function StaffUserManager({
 
                         {/* Status Badge */}
                         <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${
+                          className={`text-sm font-bold px-2 py-0.5 rounded-md border uppercase ${
                             u.isActive
-                              ? 'bg-emerald-900/30 border-emerald-500/40 text-emerald-400'
-                              : 'bg-red-900/30 border-red-500/40 text-red-400'
+                              ? 'bg-[var(--status-success-bg)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                              : 'bg-[var(--status-danger-bg)] border-[var(--status-danger-border)] text-[var(--status-danger-text)]'
                           }`}
                         >
                           {u.isActive ? 'Active' : 'Deactivated'}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-4 mt-1 text-xs text-[#F7EFD9]/60 flex-wrap">
-                        <span className="flex items-center gap-1 font-mono text-[11px]">
-                          <Mail className="w-3 h-3 text-[#D4AF37]/70" />
+                      <div className="flex items-center gap-4 mt-1 text-sm text-[var(--text-body-muted)] flex-wrap">
+                        <span className="flex items-center gap-1.5 font-mono text-sm">
+                          <Mail className="w-3.5 h-3.5 text-[var(--text-accent)] shrink-0" />
                           {u.email}
                         </span>
 
                         {/* MFA Indicator */}
                         <span
-                          className={`flex items-center gap-1 text-[11px] ${
-                            u.hasMfaVerified ? 'text-emerald-400' : 'text-amber-400/80'
+                          className={`flex items-center gap-1.5 text-sm font-medium ${
+                            u.hasMfaVerified
+                              ? 'text-[var(--text-money-positive)]'
+                              : 'text-[var(--status-warning-text)]'
                           }`}
                         >
                           {u.hasMfaVerified ? (
-                            <ShieldCheck className="w-3 h-3" />
+                            <ShieldCheck className="w-4 h-4 shrink-0" />
                           ) : (
-                            <ShieldAlert className="w-3 h-3" />
+                            <ShieldAlert className="w-4 h-4 shrink-0" />
                           )}
                           <span>
                             {u.hasMfaVerified
@@ -479,33 +494,35 @@ export function StaffUserManager({
                   </div>
 
                   {/* Right: Actions */}
-                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                    {/* Reset Password */}
+                  <div className="flex flex-wrap items-center gap-2 self-end sm:self-center shrink-0">
                     <button
+                      type="button"
                       onClick={() => setPasswordTargetUser(u)}
                       disabled={isBusy}
                       title="Reset staff password"
-                      className="px-3 py-1.5 rounded-lg bg-[#0B0A09] hover:bg-white/5 border border-white/10 text-xs text-[#F7EFD9] flex items-center gap-1.5 min-h-[44px] transition-colors"
+                      aria-label={`Reset password for ${u.fullName}`}
+                      className="px-3.5 py-2 rounded-xl bg-[var(--bg-surface-muted)] hover:border-[var(--border-gold)] border border-[var(--border-card)] text-sm font-semibold text-[var(--text-primary)] inline-flex items-center gap-1.5 min-h-[44px] min-w-[44px] transition-colors"
                     >
-                      <KeyRound className="w-3.5 h-3.5 text-[#D4AF37]" />
-                      <span className="hidden sm:inline">Password</span>
+                      <KeyRound className="w-4 h-4 text-[var(--text-accent)] shrink-0" />
+                      <span>Password</span>
                     </button>
 
-                    {/* Reset MFA */}
                     {(u.hasMfaVerified || u.mfaFactorsCount > 0) && (
                       <button
+                        type="button"
                         onClick={() => handleResetMfa(u)}
                         disabled={isBusy}
                         title="Reset MFA factor (lost phone recovery)"
-                        className="px-3 py-1.5 rounded-lg bg-[#0B0A09] hover:bg-white/5 border border-white/10 text-xs text-[#F7EFD9] flex items-center gap-1.5 min-h-[44px] transition-colors"
+                        aria-label={`Reset MFA for ${u.fullName}`}
+                        className="px-3.5 py-2 rounded-xl bg-[var(--bg-surface-muted)] hover:border-[var(--border-gold)] border border-[var(--border-card)] text-sm font-semibold text-[var(--text-primary)] inline-flex items-center gap-1.5 min-h-[44px] min-w-[44px] transition-colors"
                       >
-                        <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                        <span className="hidden sm:inline">Reset MFA</span>
+                        <RotateCcw className="w-4 h-4 text-[var(--status-warning-text)] shrink-0" />
+                        <span>Reset MFA</span>
                       </button>
                     )}
 
-                    {/* Deactivate / Reactivate Toggle */}
                     <button
+                      type="button"
                       onClick={() => handleToggleActive(u)}
                       disabled={isBusy || isCurrentUser}
                       title={
@@ -515,22 +532,22 @@ export function StaffUserManager({
                           ? 'Deactivate account'
                           : 'Reactivate account'
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 min-h-[44px] border transition-colors ${
+                      className={`px-3.5 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 min-h-[44px] border transition-colors ${
                         isCurrentUser
-                          ? 'opacity-40 cursor-not-allowed bg-black/40 border-white/5 text-white/40'
+                          ? 'opacity-45 cursor-not-allowed bg-[var(--bg-surface-muted)] border-[var(--border-subtle-card)] text-[var(--text-body-muted)]'
                           : u.isActive
-                          ? 'bg-red-950/40 hover:bg-red-900/60 border-red-500/40 text-red-300'
-                          : 'bg-emerald-950/40 hover:bg-emerald-900/60 border-emerald-500/40 text-emerald-300'
+                          ? 'bg-[var(--status-danger-bg)] hover:opacity-90 border-[var(--status-danger-border)] text-[var(--status-danger-text)]'
+                          : 'bg-[var(--status-success-bg)] hover:opacity-90 border-[var(--status-success-border)] text-[var(--status-success-text)]'
                       }`}
                     >
                       {u.isActive ? (
                         <>
-                          <UserX className="w-3.5 h-3.5" />
+                          <UserX className="w-4 h-4 shrink-0" />
                           <span>Deactivate</span>
                         </>
                       ) : (
                         <>
-                          <UserCheck className="w-3.5 h-3.5" />
+                          <UserCheck className="w-4 h-4 shrink-0" />
                           <span>Reactivate</span>
                         </>
                       )}
@@ -544,26 +561,35 @@ export function StaffUserManager({
       </div>
 
       {/* Safety Notice Card */}
-      <div className="bg-[#17120F]/60 border border-white/5 rounded-xl p-4 flex items-start gap-3 text-xs text-[#F7EFD9]/60">
-        <Info className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
+      <div className="bg-[var(--bg-card)] border border-[var(--border-subtle-card)] rounded-xl p-4 flex items-start gap-3 text-sm text-[var(--text-body-muted)]">
+        <Info className="w-4 h-4 text-[var(--text-accent)] shrink-0 mt-0.5" />
         <div>
-          <strong className="text-[#F7EFD9]">Role Enforcement Policy:</strong> Owner and Developer
-          accounts strictly mandate two-factor authenticator verification (`aal2`). Deactivating an account immediately blocks its next request and prevents any active session renewal.
+          <strong className="text-[var(--text-primary)]">Role Enforcement Policy:</strong> Owner and Developer
+          accounts strictly mandate two-factor authenticator verification (<code>aal2</code>). Deactivating an account immediately blocks its next request and prevents any active session renewal.
         </div>
       </div>
 
       {/* ADD USER MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#17120F] border border-[#D4AF37]/40 rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-team-modal-title"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle-card)] pb-3">
               <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-[#D4AF37]" />
-                <h3 className="font-bold text-base text-[#F7EFD9]">Add Team Member</h3>
+                <UserPlus className="w-5 h-5 text-[var(--text-accent)]" />
+                <h3 id="add-team-modal-title" className="font-bold text-lg text-[var(--text-primary)]">
+                  Add Team Member
+                </h3>
               </div>
               <button
+                type="button"
+                aria-label="Close Add Team Member modal"
                 onClick={() => setShowAddModal(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white/50"
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface-muted)] text-[var(--text-body-muted)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -571,76 +597,80 @@ export function StaffUserManager({
 
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#F7EFD9] mb-1">
+                <label htmlFor="add-staff-name" className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
                   Full Name
                 </label>
                 <input
+                  id="add-staff-name"
                   type="text"
                   required
                   value={addName}
                   onChange={(e) => setAddName(e.target.value)}
                   placeholder="e.g. Joy Okafor"
-                  className="w-full px-3 py-2 bg-[#0B0A09] border border-white/15 rounded-lg text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-gold)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#F7EFD9] mb-1">
+                <label htmlFor="add-staff-email" className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
                   Email Address
                 </label>
                 <input
+                  id="add-staff-email"
                   type="email"
                   required
                   value={addEmail}
                   onChange={(e) => setAddEmail(e.target.value)}
                   placeholder="e.g. joy@rockucfoods.com"
-                  className="w-full px-3 py-2 bg-[#0B0A09] border border-white/15 rounded-lg text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-gold)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#F7EFD9] mb-1">
+                <label htmlFor="add-staff-role" className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
                   Role
                 </label>
                 <select
+                  id="add-staff-role"
                   value={addRole}
                   onChange={(e) => setAddRole(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-[#0B0A09] border border-white/15 rounded-lg text-xs text-[#F7EFD9] focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-gold)]"
                 >
-                  <option value="staff">Staff (Operational KDS, Dispatch & Orders)</option>
-                  <option value="owner">Owner (Full administrative rights & finance)</option>
+                  <option value="staff">Staff (Operational KDS, Dispatch &amp; Orders)</option>
+                  <option value="owner">Owner (Full administrative rights &amp; finance)</option>
                   <option value="developer">Developer (Audited platform access with MFA)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#F7EFD9] mb-1">
+                <label htmlFor="add-staff-password" className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
                   Initial Password
                 </label>
                 <input
+                  id="add-staff-password"
                   type="text"
                   required
                   value={addPassword}
                   onChange={(e) => setAddPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#0B0A09] border border-white/15 rounded-lg text-xs text-[#F7EFD9] font-mono focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--border-gold)]"
                 />
-                <p className="text-[10px] text-white/40 mt-1">
+                <p className="text-sm text-[var(--text-body-muted)] mt-1">
                   Minimum 8 characters. Must be shared securely with the employee.
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border-subtle-card)]">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-white/70 hover:bg-white/5"
+                  className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-semibold text-[var(--text-body-muted)] border border-[var(--border-subtle-card)] hover:text-[var(--text-primary)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingAdd}
-                  className="px-4 py-2 rounded-lg bg-[#6B1230] hover:bg-[#80183b] text-[#F7EFD9] border border-[#D4AF37]/60 text-xs font-bold transition-all shadow-md min-h-[44px]"
+                  className="min-h-[44px] px-4 py-2 rounded-lg bg-[#6B1230] hover:bg-[#80183b] text-[#F7EFD9] border border-[#D4AF37]/60 text-sm font-bold transition-all shadow-md"
                 >
                   {submittingAdd ? 'Creating...' : 'Create Account'}
                 </button>
@@ -652,18 +682,25 @@ export function StaffUserManager({
 
       {/* RESET PASSWORD MODAL */}
       {passwordTargetUser && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#17120F] border border-[#D4AF37]/40 rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <Lock className="w-5 h-5 text-[#D4AF37]" />
-                <h3 className="font-bold text-base text-[#F7EFD9]">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-modal-title"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle-card)] pb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Lock className="w-5 h-5 text-[var(--text-accent)] shrink-0" />
+                <h3 id="reset-password-modal-title" className="font-bold text-base text-[var(--text-primary)] truncate">
                   Reset Password for {passwordTargetUser.fullName}
                 </h3>
               </div>
               <button
+                type="button"
+                aria-label="Close Reset Password modal"
                 onClick={() => setPasswordTargetUser(null)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white/50"
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface-muted)] text-[var(--text-body-muted)] shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -671,38 +708,93 @@ export function StaffUserManager({
 
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#F7EFD9] mb-1">
+                <label htmlFor="reset-staff-password" className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
                   New Password
                 </label>
                 <input
+                  id="reset-staff-password"
                   type="text"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#0B0A09] border border-white/15 rounded-lg text-xs text-[#F7EFD9] font-mono focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full min-h-[44px] px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-card)] rounded-lg text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--border-gold)]"
                 />
-                <p className="text-[10px] text-white/40 mt-1">
+                <p className="text-sm text-[var(--text-body-muted)] mt-1">
                   Minimum 8 characters.
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border-subtle-card)]">
                 <button
                   type="button"
                   onClick={() => setPasswordTargetUser(null)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-white/70 hover:bg-white/5"
+                  className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-semibold border border-[var(--border-subtle-card)] text-[var(--text-body-muted)] hover:text-[var(--text-primary)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingPassword}
-                  className="px-4 py-2 rounded-lg bg-[#6B1230] hover:bg-[#80183b] text-[#F7EFD9] border border-[#D4AF37]/60 text-xs font-bold transition-all shadow-md min-h-[44px]"
+                  className="min-h-[44px] px-4 py-2 rounded-lg bg-[#6B1230] hover:bg-[#80183b] text-[#F7EFD9] border border-[#D4AF37]/60 text-sm font-bold transition-all shadow-md"
                 >
                   {submittingPassword ? 'Saving...' : 'Set Password'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* CONFIRM ACTION MODAL */}
+      {pendingConfirmAction && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-staff-action-title"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div className="bg-[var(--bg-card)] border border-[var(--border-gold)] rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle-card)] pb-3 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <ShieldAlert className="w-5 h-5 text-[var(--status-warning-text)] shrink-0" />
+                <h3 id="confirm-staff-action-title" className="font-bold text-base text-[var(--text-primary)] truncate">
+                  {pendingConfirmAction.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                aria-label="Close confirmation dialog"
+                onClick={() => setPendingConfirmAction(null)}
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface-muted)] text-[var(--text-body-muted)] shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-[var(--text-primary)] leading-relaxed">
+              {pendingConfirmAction.message}
+            </p>
+
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-[var(--border-subtle-card)]">
+              <button
+                type="button"
+                onClick={() => setPendingConfirmAction(null)}
+                className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-semibold border border-[var(--border-subtle-card)] text-[var(--text-body-muted)] hover:text-[var(--text-primary)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="confirm-staff-action-button"
+                onClick={executeConfirmedAction}
+                className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-bold border transition-all shadow-md ${
+                  pendingConfirmAction.isDanger
+                    ? 'bg-[var(--status-danger-bg)] border-[var(--status-danger-border)] text-[var(--status-danger-text)] hover:opacity-90'
+                    : 'bg-[#6B1230] hover:bg-[#80183b] text-[#F7EFD9] border-[#D4AF37]/60'
+                }`}
+              >
+                {pendingConfirmAction.confirmLabel}
+              </button>
+            </div>
           </div>
         </div>
       )}

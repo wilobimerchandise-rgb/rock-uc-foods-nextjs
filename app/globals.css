@@ -2,10 +2,12 @@
 
 /* ==========================================================================
    ROCK UC FOODS - Brand Kit Design Tokens
-   Playbook v2 Section 4B & 9 (Single Source of Truth)
+   Playbook v2 Section 4B, 9 & 35 (Single Source of Truth)
    ========================================================================== */
 
 :root {
+  color-scheme: dark;
+
   --ink: #0B0A09;
   --ink-2: #17120F;
   --gold: #D4AF37;
@@ -17,12 +19,84 @@
   --wine: #6B1230;
   --red: #B3261E;
 
-  /* WCAG AA Compliant Surface Roles */
+  /* WCAG AA Compliant Surface Roles (Dark Default) */
   --bg-primary: var(--ink);
   --bg-card: var(--ink-2);
+  --bg-surface-muted: #17120F;
+  --bg-header: rgba(23, 18, 15, 0.94);
+  --bg-how-section: var(--cream);
+  --bg-how-card: #FFFFFF;
   --text-primary: var(--cream);
+  --text-secondary: var(--gold-light);
+  --text-body-muted: #E6DEC6;
   --text-gold: var(--gold);
+  --text-accent: var(--gold);
+  --nav-inactive-bg: rgba(11, 10, 9, 0.45);
+  --nav-inactive-text: var(--cream);
+  --border-gold: rgba(212, 175, 55, 0.35);
+  --border-card: rgba(212, 175, 55, 0.3);
+  --border-subtle-card: rgba(247, 239, 217, 0.14);
   --btn-primary: var(--wine);
+
+  /* Semantic Status & Order Contrast Tokens (Dark Default) */
+  --text-money-positive: #34D399;
+  --status-info-bg: rgba(12, 74, 110, 0.45);
+  --status-info-border: #0284C7;
+  --status-info-text: #E0F2FE;
+  --status-success-bg: rgba(6, 78, 59, 0.45);
+  --status-success-border: #059669;
+  --status-success-text: #D1FAE5;
+  --status-warning-bg: rgba(120, 53, 15, 0.45);
+  --status-warning-border: #D97706;
+  --status-warning-text: #FEF3C7;
+  --status-danger-bg: rgba(127, 29, 29, 0.55);
+  --status-danger-border: #DC2626;
+  --status-danger-text: #FEE2E2;
+  --status-neutral-bg: #6B1230;
+  --status-neutral-border: rgba(212, 175, 55, 0.5);
+  --status-neutral-text: #F7EFD9;
+
+  /* Assistant Widget & Interactive Tokens (Dark Default) */
+  --surface-panel: var(--ink);
+  --surface-card: var(--ink-2);
+  --surface-input: var(--ink);
+  --surface-header: var(--wine);
+  --surface-header-text: var(--cream);
+  --surface-header-subtext: var(--gold-light);
+  --surface-user-bubble: var(--wine);
+  --surface-user-text: var(--cream);
+  --surface-assistant-bubble: var(--ink-2);
+  --surface-assistant-text: var(--cream);
+  --text-link: var(--gold-light);
+  --text-muted: var(--gold-light);
+  --text-placeholder: rgba(247, 239, 217, 0.72);
+  --text-error: var(--cream);
+  --border-panel: var(--gold);
+  --border-subtle: rgba(212, 175, 55, 0.35);
+  --border-input: rgba(212, 175, 55, 0.45);
+  --border-error: var(--red);
+  --icon-on-wine: var(--gold);
+  --icon-on-surface: var(--gold);
+  --cta-wine-bg: var(--wine);
+  --cta-wine-text: var(--cream);
+  --cta-gold-bg: var(--gold);
+  --cta-gold-hover: var(--gold-light);
+  --cta-gold-text: var(--ink-2);
+  --focus-ring: var(--gold);
+  --focus-ring-on-wine: var(--gold-light);
+  --overlay-hover-wine: rgba(11, 10, 9, 0.25);
+
+  /* Spacing, Radii & Type Scale Tokens */
+  --ruc-space-xs: 0.5rem;
+  --ruc-space-sm: 0.75rem;
+  --ruc-space-md: 1rem;
+  --ruc-radius-md: 0.5rem;
+  --ruc-radius-lg: 0.75rem;
+  --ruc-radius-full: 9999px;
+  --ruc-touch-min: 44px;
+  --ruc-text-body: clamp(0.875rem, 0.85rem + 0.12vw, 0.9375rem);
+  --ruc-text-title: clamp(1rem, 0.96rem + 0.2vw, 1.0625rem);
+  --ruc-text-input: 1rem;
 }
 
 html,
@@ -31,6 +105,81 @@ body {
   color: #F7EFD9;
   min-height: 100%;
   max-width: 100%;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --bg-primary: var(--cream);
+    --bg-card: #FFFDF7;
+    --bg-surface-muted: #EFE5CA;
+    --bg-header: #FFF9EB;
+    --bg-how-section: #EFE5CA;
+    --bg-how-card: #FFFDF7;
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-2);
+    --text-body-muted: var(--ink-2);
+    --text-accent: var(--wine);
+    --nav-inactive-bg: #EFE5CA;
+    --nav-inactive-text: var(--ink-2);
+    --border-gold: var(--gold-deep);
+    --border-card: rgba(156, 122, 30, 0.45);
+    --border-subtle-card: rgba(23, 18, 15, 0.14);
+
+    /* Semantic Status & Order Contrast Tokens (Light Mode WCAG AA >= 4.5:1) */
+    --text-money-positive: #065F46;
+    --status-info-bg: #E0F2FE;
+    --status-info-border: #0369A1;
+    --status-info-text: #0C4A6E;
+    --status-success-bg: #DCFCE7;
+    --status-success-border: #15803D;
+    --status-success-text: #14532D;
+    --status-warning-bg: #FEF3C7;
+    --status-warning-border: #B45309;
+    --status-warning-text: #78350F;
+    --status-danger-bg: #FEE2E2;
+    --status-danger-border: #B91C1C;
+    --status-danger-text: #7F1D1D;
+    --status-neutral-bg: #6B1230;
+    --status-neutral-border: #9C7A1E;
+    --status-neutral-text: #F7EFD9;
+
+    --surface-panel: var(--cream);
+    --surface-card: var(--cream);
+    --surface-input: var(--cream);
+    --surface-header: var(--wine);
+    --surface-header-text: var(--cream);
+    --surface-header-subtext: var(--gold-light);
+    --surface-user-bubble: var(--wine);
+    --surface-user-text: var(--cream);
+    --surface-assistant-bubble: var(--cream);
+    --surface-assistant-text: var(--ink-2);
+    --text-link: var(--wine);
+    --text-muted: var(--ink-2);
+    --text-placeholder: var(--ink-2);
+    --text-error: var(--red);
+    --border-panel: var(--gold-deep);
+    --border-subtle: var(--gold-deep);
+    --border-input: var(--gold-deep);
+    --border-error: var(--red);
+    --icon-on-wine: var(--gold);
+    --icon-on-surface: var(--gold-deep);
+    --cta-wine-bg: var(--wine);
+    --cta-wine-text: var(--cream);
+    --cta-gold-bg: var(--gold);
+    --cta-gold-hover: var(--gold-light);
+    --cta-gold-text: var(--ink-2);
+    --focus-ring: var(--wine);
+    --focus-ring-on-wine: var(--gold-light);
+    --overlay-hover-wine: rgba(11, 10, 9, 0.25);
+  }
+
+  html,
+  body {
+    background-color: var(--cream) !important;
+    color: var(--ink);
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -44,9 +193,19 @@ body {
 
 /* Gold Gradient Headline Utility (Live text 32px or larger only) */
 .gold-headline {
+  color: var(--gold);
   background: linear-gradient(180deg, #F3D98B 0%, #D4AF37 55%, #9C7A1E 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+@media (prefers-color-scheme: light) {
+  .gold-headline {
+    color: var(--wine);
+    background: linear-gradient(180deg, #6B1230 0%, #4A0B20 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 /* Subtle luxury gold border */
@@ -75,3 +234,331 @@ body {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+/* ==========================================================================
+   Assistant Widget (Native Popover API + Brand Tokens + Accessibility)
+   ========================================================================== */
+
+.ruc-assistant-fab {
+  background-color: var(--cta-wine-bg);
+  color: var(--icon-on-wine);
+  border: 2px solid var(--border-panel);
+  min-width: 56px;
+  min-height: 56px;
+  transition: transform 0.15s ease-out;
+}
+
+.ruc-assistant-fab:hover {
+  transform: scale(1.04);
+}
+
+.ruc-assistant-fab:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.ruc-assistant-panel[popover] {
+  margin: 0;
+  inset: auto;
+  position: fixed;
+  right: calc(1rem + env(safe-area-inset-right, 0px));
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  width: min(90vw, 24rem);
+  height: min(32.5rem, 85dvh);
+  max-width: calc(100vw - 2rem);
+  padding: 0;
+  background-color: var(--surface-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--ruc-radius-lg);
+  box-shadow: 0 20px 40px rgba(11, 10, 9, 0.45);
+  overflow: hidden;
+  flex-direction: column;
+}
+
+.ruc-assistant-panel[popover]:popover-open {
+  display: flex;
+}
+
+@media (min-width: 768px) {
+  .ruc-assistant-panel[popover] {
+    right: calc(1.25rem + env(safe-area-inset-right, 0px));
+    bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.ruc-assistant-header {
+  background-color: var(--surface-header);
+  color: var(--surface-header-text);
+  border-bottom: 1px solid var(--border-panel);
+  padding: var(--ruc-space-sm) var(--ruc-space-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ruc-space-xs);
+}
+
+.ruc-assistant-header-icon {
+  color: var(--icon-on-wine);
+  flex-shrink: 0;
+}
+
+.ruc-assistant-title {
+  font-size: var(--ruc-text-title);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--surface-header-text);
+}
+
+.ruc-assistant-subtitle {
+  font-size: var(--ruc-text-body);
+  line-height: 1.35;
+  color: var(--surface-header-subtext);
+}
+
+.ruc-assistant-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ruc-touch-min);
+  min-height: var(--ruc-touch-min);
+  border-radius: var(--ruc-radius-md);
+  color: var(--surface-header-text);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.ruc-assistant-close:hover {
+  background-color: var(--overlay-hover-wine);
+}
+
+.ruc-assistant-close:focus-visible {
+  outline: 2px solid var(--focus-ring-on-wine);
+  outline-offset: 2px;
+}
+
+.ruc-assistant-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--ruc-space-md);
+  background-color: var(--surface-panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ruc-space-sm);
+}
+
+.ruc-assistant-bubble-assistant {
+  background-color: var(--surface-assistant-bubble);
+  color: var(--surface-assistant-text);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--ruc-radius-md);
+  padding: var(--ruc-space-sm);
+  font-size: var(--ruc-text-body);
+  line-height: 1.5;
+  max-width: 88%;
+}
+
+.ruc-assistant-bubble-user {
+  background-color: var(--surface-user-bubble);
+  color: var(--surface-user-text);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--ruc-radius-md);
+  padding: var(--ruc-space-sm);
+  font-size: var(--ruc-text-body);
+  line-height: 1.5;
+  max-width: 88%;
+}
+
+.ruc-assistant-divider {
+  margin-top: var(--ruc-space-sm);
+  padding-top: var(--ruc-space-xs);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ruc-assistant-cta-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: var(--ruc-touch-min);
+  min-height: var(--ruc-touch-min);
+  padding: 0.625rem 0.875rem;
+  font-size: var(--ruc-text-body);
+  font-weight: 700;
+  line-height: 1.3;
+  border-radius: var(--ruc-radius-md);
+  background-color: var(--cta-gold-bg);
+  color: var(--cta-gold-text);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.ruc-assistant-cta-gold:hover {
+  background-color: var(--cta-gold-hover);
+}
+
+.ruc-assistant-cta-gold:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ruc-assistant-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: var(--ruc-touch-min);
+  min-height: var(--ruc-touch-min);
+  padding: 0.5rem 0.25rem;
+  font-size: var(--ruc-text-body);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-link);
+  text-decoration: none;
+  border-radius: var(--ruc-radius-md);
+}
+
+.ruc-assistant-whatsapp:hover {
+  text-decoration: underline;
+}
+
+.ruc-assistant-whatsapp:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ruc-assistant-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--ruc-space-xs);
+  font-size: var(--ruc-text-body);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.ruc-assistant-empty {
+  font-size: var(--ruc-text-body);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.ruc-assistant-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ruc-space-xs);
+  font-size: var(--ruc-text-body);
+  line-height: 1.4;
+  color: var(--text-error);
+  border: 1px solid var(--border-error);
+  background-color: var(--surface-card);
+  border-radius: var(--ruc-radius-md);
+  padding: var(--ruc-space-xs) var(--ruc-space-sm);
+}
+
+.ruc-assistant-form {
+  padding: var(--ruc-space-sm);
+  background-color: var(--surface-card);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: var(--ruc-space-xs);
+}
+
+.ruc-assistant-input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--ruc-touch-min);
+  background-color: var(--surface-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-input);
+  border-radius: var(--ruc-radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: var(--ruc-text-input);
+  line-height: 1.4;
+}
+
+.ruc-assistant-input::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
+}
+
+.ruc-assistant-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--border-panel);
+}
+
+.ruc-assistant-input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.ruc-assistant-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ruc-touch-min);
+  min-height: var(--ruc-touch-min);
+  border-radius: var(--ruc-radius-md);
+  background-color: var(--cta-wine-bg);
+  color: var(--cta-wine-text);
+  border: 1px solid var(--border-panel);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ruc-assistant-send:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.ruc-assistant-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ruc-assistant-send:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ruc-assistant-send-icon {
+  color: var(--icon-on-wine);
+}
+
+@keyframes ruc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ruc-assistant-spinner {
+  color: var(--icon-on-surface);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ruc-assistant-spinner {
+    animation: ruc-spin 1s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ruc-assistant-fab,
+  .ruc-assistant-panel,
+  .ruc-assistant-close,
+  .ruc-assistant-send,
+  .ruc-assistant-cta-gold,
+  .ruc-assistant-whatsapp,
+  .ruc-assistant-spinner {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .ruc-assistant-fab:hover {
+    transform: none !important;
+  }
+}
+

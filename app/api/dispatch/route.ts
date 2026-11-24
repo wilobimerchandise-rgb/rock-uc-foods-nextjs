@@ -12,38 +12,80 @@ import {
 import { orderRepository } from '@/src/order/orderRepository';
 import { normalizeNigerianPhone } from '@/src/notifications/phone';
 import { sendOrderNotification } from '@/src/notifications/notificationEngine';
+import { isSameOrigin } from '@/src/lib/same-origin';
+import { resolveActiveAdminProfile, serializeOrderForApi } from '@/src/order/orderAuth';
+import { requireRole, AuthorizationError } from '@/src/lib/auth/access';
 
-function serializeOrder(order: any) {
-  if (!order) return null;
-  return {
-    ...order,
-    deliveryFeeKobo: order.deliveryFeeKobo?.toString(),
-    subtotalKobo: order.subtotalKobo?.toString(),
-    totalKobo: order.totalKobo?.toString(),
-    discountKobo: order.discountKobo ? order.discountKobo.toString() : undefined,
-    items: (order.items || []).map((i: any) => ({
-      ...i,
-      unitPriceKoboSnapshot: i.unitPriceKoboSnapshot?.toString(),
-      totalKoboSnapshot: i.totalKoboSnapshot?.toString(),
-    })),
-  };
-}
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const adminRes = await resolveActiveAdminProfile(req);
+  if ('error' in adminRes) {
+    return NextResponse.json(
+      { error: adminRes.error },
+      { status: adminRes.status, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
+  try {
+    requireRole(
+      ['owner', 'staff', 'developer'],
+      adminRes.userProfile,
+      'view dispatch assignments',
+      'dispatch_assignments'
+    );
+  } catch (err: any) {
+    if (err instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+    throw err;
+  }
+
   const { searchParams } = new URL(req.url);
   const orderId = searchParams.get('orderId');
 
   if (orderId) {
     const assignment = dispatchRepository.getByOrderId(orderId);
-    return NextResponse.json({ assignment });
+    return NextResponse.json(
+      { assignment },
+      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
   const assignments = dispatchRepository.getAll();
-  return NextResponse.json({ assignments });
+  return NextResponse.json(
+    { assignments },
+    { status: 200, headers: { 'Cache-Control': 'no-store' } }
+  );
 }
 
 export async function POST(req: NextRequest) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json(
+      { error: 'Cross-origin or missing origin requests are forbidden.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
+  const adminRes = await resolveActiveAdminProfile(req);
+  if ('error' in adminRes) {
+    return NextResponse.json(
+      { error: adminRes.error },
+      { status: adminRes.status, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
   try {
+    const actor = requireRole(
+      ['owner', 'staff', 'developer'],
+      adminRes.userProfile,
+      'manage dispatch assignments',
+      'dispatch_assignments'
+    );
+
     const body = await req.json();
     const { action, orderId, riderName, riderPhone, riderVehiclePlate, customerSignatureConfirmed } = body;
 
@@ -51,7 +93,7 @@ export async function POST(req: NextRequest) {
       if (!orderId || !riderName || !riderPhone) {
         return NextResponse.json(
           { error: 'orderId, riderName, and riderPhone are required.' },
-          { status: 400 }
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
         );
       }
 
@@ -80,12 +122,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({ success: true, assignment });
+      return NextResponse.json(
+        { success: true, assignment },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     if (action === 'confirm_delivery') {
       if (!orderId) {
-        return NextResponse.json({ error: 'orderId is required.' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'orderId is required.' },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        );
       }
 
       const assignment = confirmDelivery({
@@ -102,15 +150,36 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({
-        success: true,
-        assignment,
-        order: serializeOrder(order),
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          assignment,
+          order: order
+            ? serializeOrderForApi(order, {
+                isAdmin: true,
+                role: actor.role,
+                hasMfaVerified: actor.hasMfaVerified,
+              })
+            : null,
+        },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
-    return NextResponse.json({ error: `Unknown action: '${action}'` }, { status: 400 });
+    return NextResponse.json(
+      { error: `Unknown action: '${action}'` },
+      { status: 400, headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Dispatch action failed.' }, { status: 400 });
+    if (err instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+    return NextResponse.json(
+      { error: err.message || 'Dispatch action failed.' },
+      { status: 400, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 }

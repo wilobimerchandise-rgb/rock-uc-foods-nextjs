@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { isSameOrigin } from '../../../../src/lib/same-origin';
 import { getClientIp } from '../../../../src/lib/client-ip';
-import { globalAuthService, getProfileFromService } from '../../../../src/auth/wiring';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '../../../../src/auth/wiring';
 import {
   getLatestSiteContentVersion,
   saveSiteContent,
@@ -28,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Authentication & Second-Factor Check
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -45,9 +49,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const hasVerifiedTotp =
-    (user.factors?.some((f) => f.factor_type === 'totp' && f.status === 'verified') ?? false) ||
-    sessionRes.session?.aal === 'aal2';
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
 
   // 3. Body validation
   let body: Record<string, unknown>;

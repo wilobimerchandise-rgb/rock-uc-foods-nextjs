@@ -13,78 +13,97 @@ export interface DishCustomizerModalProps {
   triggerElement?: HTMLElement | null;
 }
 
+function getInitialTierId(dish: FormattedMenuItem | null): string {
+  if (dish?.sizeTiers && dish.sizeTiers.length > 0) {
+    const firstActive = dish.sizeTiers.find((t) => t.active) || dish.sizeTiers[0];
+    return firstActive ? firstActive.id : '';
+  }
+  return '';
+}
+
+function getInitialOptionIds(dish: FormattedMenuItem | null): string[] {
+  const defaultOpts: string[] = [];
+  if (dish?.optionGroups && dish.optionGroups.length > 0) {
+    for (const group of dish.optionGroups) {
+      const availableOpts = group.options.filter((o) => o.active);
+      if (group.minChoices > 0 && availableOpts.length > 0) {
+        defaultOpts.push(availableOpts[0].id);
+      }
+    }
+  }
+  return defaultOpts;
+}
+
 export function DishCustomizerModal({
   isOpen,
   dish,
   onClose,
   triggerElement,
 }: DishCustomizerModalProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
-  const { addItem, setIsCartOpen } = useCart();
+  const wasOpenRef = useRef(false);
 
-  // Selected state initialized from current dish
-  const [selectedTierId, setSelectedTierId] = useState<string>(() => {
-    if (dish?.sizeTiers && dish.sizeTiers.length > 0) {
-      const firstActive = dish.sizeTiers.find((t) => t.active) || dish.sizeTiers[0];
-      return firstActive ? firstActive.id : '';
-    }
-    return '';
-  });
-
-  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>(() => {
-    const defaultOpts: string[] = [];
-    if (dish?.optionGroups && dish.optionGroups.length > 0) {
-      for (const group of dish.optionGroups) {
-        const availableOpts = group.options.filter((o) => o.active);
-        if (group.minChoices > 0 && availableOpts.length > 0) {
-          defaultOpts.push(availableOpts[0].id);
-        }
-      }
-    }
-    return defaultOpts;
-  });
-
-  const [quantity, setQuantity] = useState<number>(1);
-
-  // Focus restore ref update inside effect
   useEffect(() => {
     if (triggerElement) {
       lastTriggerRef.current = triggerElement;
     }
   }, [triggerElement]);
 
-  // Native dialog showModal & body lock
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
     if (isOpen && dish) {
-      if (typeof dialog.showModal === 'function' && !dialog.open) {
-        dialog.showModal();
-      }
-      document.body.style.overflow = 'hidden';
-    } else {
-      if (dialog.open) {
-        dialog.close();
-      }
-      document.body.style.overflow = '';
+      wasOpenRef.current = true;
+    } else if (wasOpenRef.current) {
+      wasOpenRef.current = false;
       if (lastTriggerRef.current && typeof lastTriggerRef.current.focus === 'function') {
         lastTriggerRef.current.focus();
       }
     }
-
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [isOpen, dish]);
 
+  if (!isOpen || !dish) return null;
+
+  return <DishCustomizerDialog key={dish.id} dish={dish} onClose={onClose} />;
+}
+
+interface DishCustomizerDialogProps {
+  dish: FormattedMenuItem;
+  onClose: () => void;
+}
+
+function DishCustomizerDialog({ dish, onClose }: DishCustomizerDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const { addItem, setIsCartOpen } = useCart();
+
+  const [selectedTierId, setSelectedTierId] = useState<string>(() => getInitialTierId(dish));
+  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>(() =>
+    getInitialOptionIds(dish)
+  );
+  const [quantity, setQuantity] = useState<number>(1);
+
+  // Native dialog showModal & body scroll lock on mount/unmount
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (typeof dialog.showModal === 'function' && !dialog.open) {
+      dialog.showModal();
+    }
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      if (dialog.open) {
+        dialog.close();
+      }
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   // Calculate live total kobo directly during render
-  let basePrice = dish?.basePriceKobo ?? 0n;
+  let basePrice = dish.basePriceKobo ?? 0n;
   let isSelectionValid = true;
   let validationError = '';
 
-  if (dish?.sizeTiers && dish.sizeTiers.length > 0) {
+  if (dish.sizeTiers && dish.sizeTiers.length > 0) {
     const tier = dish.sizeTiers.find((t) => t.id === selectedTierId);
     if (!tier) {
       isSelectionValid = false;
@@ -95,7 +114,7 @@ export function DishCustomizerModal({
   }
 
   let optionsExtra = 0n;
-  if (dish?.optionGroups && dish.optionGroups.length > 0) {
+  if (dish.optionGroups && dish.optionGroups.length > 0) {
     for (const group of dish.optionGroups) {
       const selectedInGroup = group.options.filter((o) => selectedOptionIds.includes(o.id));
       if (selectedInGroup.length < group.minChoices) {
@@ -116,26 +135,22 @@ export function DishCustomizerModal({
 
   const currentUnitPriceKobo = isSelectionValid ? basePrice + optionsExtra : 0n;
 
-  if (!isOpen || !dish) return null;
-
   const toggleOption = (groupId: string, optId: string, maxChoices: number) => {
     const group = dish.optionGroups?.find((g) => g.id === groupId);
     if (!group) return;
 
-    const currentSelectedInGroup = group.options.filter((o) => selectedOptionIds.includes(o.id)).map((o) => o.id);
+    const currentSelectedInGroup = group.options
+      .filter((o) => selectedOptionIds.includes(o.id))
+      .map((o) => o.id);
 
     if (maxChoices === 1) {
-      // Single select: replace choice in group
       const otherSelected = selectedOptionIds.filter((id) => !currentSelectedInGroup.includes(id));
       setSelectedOptionIds([...otherSelected, optId]);
     } else {
-      // Multi select: toggle
       if (selectedOptionIds.includes(optId)) {
         setSelectedOptionIds(selectedOptionIds.filter((id) => id !== optId));
-      } else {
-        if (currentSelectedInGroup.length < maxChoices) {
-          setSelectedOptionIds([...selectedOptionIds, optId]);
-        }
+      } else if (currentSelectedInGroup.length < maxChoices) {
+        setSelectedOptionIds([...selectedOptionIds, optId]);
       }
     }
   };
@@ -155,6 +170,8 @@ export function DishCustomizerModal({
   return (
     <dialog
       ref={dialogRef}
+      aria-labelledby="dish-customizer-title"
+      aria-modal="true"
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -166,26 +183,29 @@ export function DishCustomizerModal({
           onClose();
         }
       }}
-      className="m-auto rounded-3xl bg-[#17120F] text-[#F7EFD9] border border-[#D4AF37]/40 shadow-2xl backdrop:bg-[#0B0A09]/80 backdrop:backdrop-blur-sm p-0 max-w-lg w-[95vw] overflow-hidden focus:outline-none"
+      className="m-auto rounded-3xl bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-gold)] shadow-2xl backdrop:bg-black/75 backdrop:backdrop-blur-sm p-0 max-w-lg w-[95vw] overflow-hidden focus:outline-none"
     >
       {/* Header */}
-      <div className="relative p-5 sm:p-6 border-b border-[#D4AF37]/20 flex items-start justify-between bg-gradient-to-r from-[#241A14] to-[#17120F]">
-        <div className="space-y-1 pr-6">
-          <span className="text-[10px] uppercase tracking-widest text-[#D4AF37] font-semibold">
+      <div className="relative p-5 sm:p-6 border-b border-[var(--border-card)] bg-[var(--bg-surface-muted)] flex items-start justify-between gap-3">
+        <div className="space-y-1 pr-2">
+          <span className="text-sm uppercase tracking-wider text-[var(--text-accent)] font-semibold block">
             Customise Dish
           </span>
-          <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#F7EFD9] tracking-tight leading-tight">
+          <h2
+            id="dish-customizer-title"
+            className="font-serif text-xl sm:text-2xl font-bold text-[var(--text-primary)] tracking-tight leading-tight"
+          >
             {dish.name}
           </h2>
           {dish.portionLabel && (
-            <p className="text-xs text-[#F7EFD9]/60">{dish.portionLabel}</p>
+            <p className="text-sm text-[var(--text-body-muted)]">{dish.portionLabel}</p>
           )}
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close customiser"
-          className="w-9 h-9 rounded-full bg-[#0B0A09] border border-[#D4AF37]/30 text-[#D4AF37] hover:border-[#D4AF37] flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+          className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--bg-primary)] border border-[var(--border-gold)] text-[var(--text-accent)] hover:opacity-90 flex items-center justify-center shrink-0 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
         >
           <X className="w-5 h-5" />
         </button>
@@ -196,11 +216,11 @@ export function DishCustomizerModal({
         {/* Size Tiers */}
         {dish.sizeTiers && dish.sizeTiers.length > 0 && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs uppercase tracking-wider font-bold text-[#D4AF37]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm uppercase tracking-wider font-bold text-[var(--text-accent)]">
                 Select Size
-              </label>
-              <span className="text-[10px] text-[#F7EFD9]/60">Required</span>
+              </span>
+              <span className="text-sm text-[var(--text-body-muted)]">Required</span>
             </div>
             <div className="grid grid-cols-3 gap-2.5">
               {dish.sizeTiers.map((tier) => {
@@ -210,14 +230,15 @@ export function DishCustomizerModal({
                     key={tier.id}
                     type="button"
                     onClick={() => setSelectedTierId(tier.id)}
-                    className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                    aria-pressed={isSelected}
+                    className={`min-h-[56px] p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
                       isSelected
-                        ? 'border-[#D4AF37] bg-[#D4AF37]/15 ring-2 ring-[#D4AF37]/30'
-                        : 'border-[#D4AF37]/25 bg-[#0B0A09]/60 hover:border-[#D4AF37]/50'
+                        ? 'border-[var(--border-gold)] bg-[var(--bg-surface-muted)] ring-2 ring-[var(--border-gold)]'
+                        : 'border-[var(--border-card)] bg-[var(--bg-primary)] hover:border-[var(--border-gold)]'
                     }`}
                   >
-                    <span className="font-bold text-sm text-[#F7EFD9]">{tier.label}</span>
-                    <span className="text-xs text-[#D4AF37] font-mono">
+                    <span className="font-bold text-base text-[var(--text-primary)]">{tier.label}</span>
+                    <span className="text-sm text-[var(--text-accent)] font-mono price-tabular font-semibold whitespace-nowrap">
                       {tier.formattedPrice}
                     </span>
                   </button>
@@ -228,22 +249,22 @@ export function DishCustomizerModal({
         )}
 
         {/* Option Groups */}
-        {dish.optionGroups && dish.optionGroups.map((group) => {
-          return (
-            <div key={group.id} className="space-y-3 border-t border-[#D4AF37]/15 pt-4">
-              <div className="flex items-center justify-between">
+        {dish.optionGroups &&
+          dish.optionGroups.map((group) => (
+            <div key={group.id} className="space-y-3 border-t border-[var(--border-card)] pt-4">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-xs uppercase tracking-wider font-bold text-[#D4AF37]">
+                  <h3 className="text-sm uppercase tracking-wider font-bold text-[var(--text-accent)]">
                     {group.title}
                   </h3>
-                  <p className="text-[11px] text-[#F7EFD9]/60">
+                  <p className="text-sm text-[var(--text-body-muted)]">
                     {group.maxChoices === 1
                       ? 'Choose 1 option'
                       : `Choose up to ${group.maxChoices} (Min: ${group.minChoices})`}
                   </p>
                 </div>
                 {group.minChoices > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#6B1230]/60 border border-[#D4AF37]/30 text-[#D4AF37] font-medium">
+                  <span className="text-sm font-semibold text-[var(--text-accent)] shrink-0">
                     Required
                   </span>
                 )}
@@ -257,32 +278,33 @@ export function DishCustomizerModal({
                       key={opt.id}
                       type="button"
                       disabled={!opt.active}
+                      aria-pressed={isSelected}
                       onClick={() => toggleOption(group.id, opt.id, group.maxChoices)}
-                      className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left ${
+                      className={`w-full min-h-[48px] p-3 rounded-xl border flex items-center justify-between gap-3 transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
                         !opt.active
-                          ? 'opacity-40 cursor-not-allowed border-gray-800 bg-black/40'
+                          ? 'opacity-50 cursor-not-allowed border-[var(--border-subtle-card)] bg-[var(--bg-surface-muted)]'
                           : isSelected
-                          ? 'border-[#D4AF37] bg-[#D4AF37]/15 ring-1 ring-[#D4AF37]/30'
-                          : 'border-[#D4AF37]/25 bg-[#0B0A09]/60 hover:border-[#D4AF37]/50'
+                          ? 'cursor-pointer border-[var(--border-gold)] bg-[var(--bg-surface-muted)] ring-1 ring-[var(--border-gold)]'
+                          : 'cursor-pointer border-[var(--border-card)] bg-[var(--bg-primary)] hover:border-[var(--border-gold)]'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <div
-                          className={`w-5 h-5 rounded-${
-                            group.maxChoices === 1 ? 'full' : 'md'
-                          } border flex items-center justify-center transition-colors ${
+                          className={`w-5 h-5 ${
+                            group.maxChoices === 1 ? 'rounded-full' : 'rounded-md'
+                          } border flex items-center justify-center shrink-0 transition-colors ${
                             isSelected
-                              ? 'border-[#D4AF37] bg-[#D4AF37] text-[#0B0A09]'
-                              : 'border-[#D4AF37]/40 bg-[#0B0A09]'
+                              ? 'border-[var(--cta-gold-bg)] bg-[var(--cta-gold-bg)] text-[var(--cta-gold-text)]'
+                              : 'border-[var(--border-gold)] bg-[var(--bg-card)]'
                           }`}
                         >
                           {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                         </div>
-                        <span className="text-xs sm:text-sm font-medium text-[#F7EFD9]">
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
                           {opt.label}
                         </span>
                       </div>
-                      <span className="text-xs font-mono text-[#D4AF37] shrink-0">
+                      <span className="text-sm font-mono price-tabular font-semibold text-[var(--text-accent)] shrink-0 whitespace-nowrap">
                         {opt.formattedExtra}
                       </span>
                     </button>
@@ -290,51 +312,55 @@ export function DishCustomizerModal({
                 })}
               </div>
             </div>
-          );
-        })}
+          ))}
 
         {/* Quantity Stepper */}
-        <div className="border-t border-[#D4AF37]/15 pt-4 flex items-center justify-between">
-          <label className="text-xs uppercase tracking-wider font-bold text-[#D4AF37]">
+        <div className="border-t border-[var(--border-card)] pt-4 flex items-center justify-between gap-4">
+          <span className="text-sm uppercase tracking-wider font-bold text-[var(--text-accent)]">
             Quantity
-          </label>
-          <div className="flex items-center gap-3 bg-[#0B0A09] border border-[#D4AF37]/30 rounded-xl p-1">
+          </span>
+          <div className="flex items-center gap-2 bg-[var(--bg-primary)] border border-[var(--border-gold)] rounded-xl p-1">
             <button
               type="button"
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}
               disabled={quantity <= 1}
-              className="w-8 h-8 rounded-lg bg-[#17120F] text-[#D4AF37] hover:bg-[#241A14] flex items-center justify-center disabled:opacity-30 cursor-pointer"
+              aria-label="Decrease quantity"
+              className="min-w-[44px] min-h-[44px] rounded-lg bg-[var(--bg-card)] text-[var(--text-accent)] hover:bg-[var(--bg-surface-muted)] flex items-center justify-center disabled:opacity-40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             >
-              <Minus className="w-3.5 h-3.5" />
+              <Minus className="w-4 h-4" />
             </button>
-            <span className="font-mono font-bold text-sm text-[#F7EFD9] w-6 text-center">
+            <span className="font-mono price-tabular font-bold text-base text-[var(--text-primary)] min-w-[2.5rem] text-center">
               {quantity}
             </span>
             <button
               type="button"
               onClick={() => setQuantity((q) => Math.min(100, q + 1))}
               disabled={quantity >= 100}
-              className="w-8 h-8 rounded-lg bg-[#17120F] text-[#D4AF37] hover:bg-[#241A14] flex items-center justify-center disabled:opacity-30 cursor-pointer"
+              aria-label="Increase quantity"
+              className="min-w-[44px] min-h-[44px] rounded-lg bg-[var(--bg-card)] text-[var(--text-accent)] hover:bg-[var(--bg-surface-muted)] flex items-center justify-center disabled:opacity-40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {validationError && (
-          <p className="text-xs text-[#FF8585] bg-[#6B1230]/40 p-2.5 rounded-lg border border-[#FF8585]/30">
+          <p
+            role="alert"
+            className="text-sm text-[var(--status-danger-text)] bg-[var(--status-danger-bg)] p-3 rounded-lg border border-[var(--status-danger-border)]"
+          >
             {validationError}
           </p>
         )}
       </div>
 
       {/* Footer */}
-      <div className="p-4 sm:p-6 bg-[#0B0A09] border-t border-[#D4AF37]/20 flex items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 bg-[var(--bg-surface-muted)] border-t border-[var(--border-card)] flex items-center justify-between gap-4">
         <div>
-          <span className="text-[10px] uppercase tracking-wider text-[#F7EFD9]/60 block">
+          <span className="text-sm uppercase tracking-wider text-[var(--text-body-muted)] block">
             Item Total
           </span>
-          <span className="font-sans font-bold text-lg sm:text-xl text-[#D4AF37] whitespace-nowrap">
+          <span className="font-sans price-tabular font-bold text-lg sm:text-xl text-[var(--text-accent)] whitespace-nowrap">
             {formatMoneyKobo(currentUnitPriceKobo * BigInt(quantity))}
           </span>
         </div>
@@ -343,9 +369,9 @@ export function DishCustomizerModal({
           type="button"
           onClick={handleAddToCart}
           disabled={!isSelectionValid}
-          className="flex-1 bg-gradient-to-r from-[#D4AF37] to-[#B08D26] hover:from-[#E5C158] hover:to-[#D4AF37] text-[#0B0A09] font-bold text-xs sm:text-sm py-3 px-5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 min-h-[48px] bg-[var(--cta-gold-bg)] hover:bg-[var(--cta-gold-hover)] text-[var(--cta-gold-text)] font-bold text-sm sm:text-base py-3 px-5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
         >
-          <ShoppingBag className="w-4 h-4" />
+          <ShoppingBag className="w-4 h-4 shrink-0" />
           <span>Add to Order</span>
         </button>
       </div>

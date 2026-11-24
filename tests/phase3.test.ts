@@ -232,7 +232,7 @@ describe('Phase 3: Order Repository & Status Lifecycle', () => {
     // 1. Verify Payment
     const verified = orderRepository.updateStatus(order.id, 'payment_confirmed', {
       actorUserId: 'usr-owner-01',
-      paymentReference: 'WEMA-98127391',
+      paymentReference: 'GTB-98127391',
     });
     expect(verified.status).toBe('payment_confirmed');
     expect(verified.paymentVerifiedAt).toBeDefined();

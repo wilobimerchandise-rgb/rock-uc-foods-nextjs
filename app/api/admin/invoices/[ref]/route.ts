@@ -4,12 +4,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { isSameOrigin } from '@/src/lib/same-origin';
-import { globalAuthService, getProfileFromService } from '@/src/auth/wiring';
-import { invoiceRepository, estimateRepository, invoiceLinksRepository } from '@/src/invoices/repository';
-import { issueInvoice } from '@/src/invoices/issue';
-import { requireRole, AuthorizationError, UserProfile } from '@/src/lib/auth/access';
-import { formatNaira } from '@/src/lib/money';
+import { isSameOrigin } from '../../../../../src/lib/same-origin';
+import {
+  resolveSessionFromRequest,
+  getProfileFromService,
+  hasSessionVerifiedMfa,
+} from '../../../../../src/auth/wiring';
+import { invoiceRepository, estimateRepository, invoiceLinksRepository } from '../../../../../src/invoices/repository';
+import { issueInvoice } from '../../../../../src/invoices/issue';
+import { requireRole, AuthorizationError, UserProfile } from '../../../../../src/lib/auth/access';
+import { formatNaira } from '../../../../../src/lib/money';
+import { maskCustomerPhone } from '../../../../../src/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +25,7 @@ export async function GET(
   const { ref } = await params;
 
   // 1. Authentication
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -37,13 +42,15 @@ export async function GET(
     );
   }
 
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
+
   const userProfile: UserProfile = {
     id: profile.id,
     role: profile.role,
     isActive: profile.isActive,
     fullName: profile.fullName,
     email: profile.email,
-    hasMfaVerified: sessionRes.session?.aal === 'aal2',
+    hasMfaVerified: hasVerifiedTotp,
   };
 
   try {
@@ -66,7 +73,11 @@ export async function GET(
         publicRef: invoice.publicRef,
         status: invoice.status,
         customerName: estimate?.contactName || 'Valued Client',
-        customerPhone: estimate?.contactPhone || '',
+        customerPhone: maskCustomerPhone(
+          estimate?.contactPhone || '',
+          userProfile.role,
+          userProfile.hasMfaVerified
+        ),
         customerEmail: estimate?.contactEmail,
         guests: estimate?.inputs?.guests || 0,
         packageId: estimate?.inputs?.packageId,
@@ -126,7 +137,7 @@ export async function POST(
   }
 
   // 2. Authentication
-  const sessionRes = await globalAuthService.getSession();
+  const sessionRes = await resolveSessionFromRequest(request);
   const user = sessionRes.session?.user;
   if (!user) {
     return NextResponse.json(
@@ -143,13 +154,15 @@ export async function POST(
     );
   }
 
+  const hasVerifiedTotp = hasSessionVerifiedMfa(sessionRes.session);
+
   const userProfile: UserProfile = {
     id: profile.id,
     role: profile.role,
     isActive: profile.isActive,
     fullName: profile.fullName,
     email: profile.email,
-    hasMfaVerified: sessionRes.session?.aal === 'aal2',
+    hasMfaVerified: hasVerifiedTotp,
   };
 
   try {

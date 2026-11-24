@@ -5,35 +5,100 @@
  * itemized catering breakdowns, deposit/balance schedules, and verbatim policy footers.
  */
 
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { CateringEvent, CateringQuote } from '../types/catering';
 import { BUSINESS_CONTACT, INVOICE_FOOTER, ALLERGEN_NOTICE } from '../policy/content';
+import { formatNaira } from '../lib/money';
+import { getBusinessBankSettings, hasVerifiedBankSettings } from '../lib/businessSettings';
+
+async function loadFontBytesFromServer(relPublicName: string, systemFallbackPaths: string[]): Promise<Uint8Array | null> {
+  try {
+    const [nodeFs, nodePath] = await Promise.all([
+      import(/* webpackIgnore: true */ 'node:fs'),
+      import(/* webpackIgnore: true */ 'node:path'),
+    ]);
+    const localPublicPath = nodePath.join(process.cwd(), 'public', 'fonts', relPublicName);
+    for (const fp of [localPublicPath, ...systemFallbackPaths]) {
+      if (nodeFs.existsSync(fp)) {
+        return new Uint8Array(nodeFs.readFileSync(fp));
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function loadFontBytesFromBrowser(relPublicName: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(`/fonts/${relPublicName}`);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch {
+    return null;
+  }
+}
+
+async function loadCateringFonts(pdfDoc: PDFDocument) {
+  pdfDoc.registerFontkit(fontkit);
+  const isBrowser = typeof window !== 'undefined';
+
+  const loadBytes = async (relPublicName: string, sysPaths: string[]) =>
+    isBrowser
+      ? loadFontBytesFromBrowser(relPublicName)
+      : loadFontBytesFromServer(relPublicName, sysPaths);
+
+  const [regularBytes, boldBytes, italicBytes] = await Promise.all([
+    loadBytes('LiberationSans-Regular.ttf', [
+      '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    ]),
+    loadBytes('LiberationSans-Bold.ttf', [
+      '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    ]),
+    loadBytes('LiberationSans-Italic.ttf', [
+      '/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf',
+    ]),
+  ]);
+
+  if (!regularBytes) {
+    throw new Error('Required PDF TrueType font (LiberationSans-Regular.ttf) could not be loaded.');
+  }
+
+  const regular = await pdfDoc.embedFont(regularBytes);
+  const bold = boldBytes ? await pdfDoc.embedFont(boldBytes) : regular;
+  const oblique = italicBytes ? await pdfDoc.embedFont(italicBytes) : regular;
+
+  return { font: regular, fontBold: bold, fontOblique: oblique };
+}
 
 export interface CateringPdfResult {
   pdfBytes: Uint8Array;
   filename: string;
 }
 
-/**
- * Standard PDF font-safe currency formatter (NGN X,XXX.XX)
- * Prevents WinAnsi encoding errors with Helvetica while retaining exact kobo accuracy.
- */
-function formatPdfMoney(kobo: bigint): string {
-  const naira = Number(kobo) / 100;
-  return `NGN ${naira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export interface CateringPdfOptions {
+  bankDetails?: {
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
+  } | null;
 }
 
 export async function generateCateringInvoicePdf(
   event: CateringEvent,
-  quote: CateringQuote
+  quote: CateringQuote,
+  options?: CateringPdfOptions
 ): Promise<CateringPdfResult> {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([595.28, 841.89]); // A4 (595 x 842 points)
   const { width, height } = page.getSize();
 
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const fontOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+  const { font, fontBold, fontOblique } = await loadCateringFonts(pdfDoc);
 
   // Palette
   const colorWine = rgb(107 / 255, 18 / 255, 48 / 255); // #6B1230
@@ -149,9 +214,9 @@ export async function generateCateringInvoicePdf(
   });
 
   page.drawText('ITEM / CATERING PACKAGE', { x: 50, y: curY - 11, size: 8, font: fontBold, color: colorGold });
-  page.drawText('QTY', { x: 330, y: curY - 11, size: 8, font: fontBold, color: colorGold });
-  page.drawText('UNIT PRICE (NGN)', { x: 380, y: curY - 11, size: 8, font: fontBold, color: colorGold });
-  page.drawText('LINE TOTAL (NGN)', { x: 480, y: curY - 11, size: 8, font: fontBold, color: colorGold });
+  page.drawText('QTY', { x: 315, y: curY - 11, size: 8, font: fontBold, color: colorGold });
+  page.drawText('UNIT PRICE', { x: 365, y: curY - 11, size: 8, font: fontBold, color: colorGold });
+  page.drawText('LINE TOTAL', { x: 465, y: curY - 11, size: 8, font: fontBold, color: colorGold });
 
   curY -= 28;
 
@@ -162,9 +227,9 @@ export async function generateCateringInvoicePdf(
       page.drawText(item.portionLabel, { x: 50, y: curY - 11, size: 8, font: fontOblique, color: colorGray });
     }
 
-    page.drawText(String(item.quantity), { x: 335, y: curY, size: 9, font, color: colorDark });
-    page.drawText(formatPdfMoney(item.unitPriceKobo), { x: 380, y: curY, size: 9, font, color: colorDark });
-    page.drawText(formatPdfMoney(item.totalKobo), { x: 480, y: curY, size: 9, font: fontBold, color: colorDark });
+    page.drawText(String(item.quantity), { x: 320, y: curY, size: 9, font, color: colorDark });
+    page.drawText(formatNaira(item.unitPriceKobo), { x: 365, y: curY, size: 9, font, color: colorDark });
+    page.drawText(formatNaira(item.totalKobo), { x: 465, y: curY, size: 9, font: fontBold, color: colorDark });
 
     curY -= 24;
   }
@@ -180,19 +245,19 @@ export async function generateCateringInvoicePdf(
   curY -= 15;
 
   // 5. Financial Summary Block (Right aligned)
-  const sumLabelX = 350;
-  const sumValX = 480;
+  const sumLabelX = 335;
+  const sumValX = 465;
 
   page.drawText('Food Subtotal:', { x: sumLabelX, y: curY, size: 8, font, color: colorDark });
-  page.drawText(formatPdfMoney(quote.foodSubtotalKobo), { x: sumValX, y: curY, size: 8, font, color: colorDark });
+  page.drawText(formatNaira(quote.foodSubtotalKobo), { x: sumValX, y: curY, size: 8, font, color: colorDark });
   curY -= 14;
 
   page.drawText('Logistics & Transport:', { x: sumLabelX, y: curY, size: 8, font, color: colorDark });
-  page.drawText(formatPdfMoney(quote.logisticsFeeKobo), { x: sumValX, y: curY, size: 8, font, color: colorDark });
+  page.drawText(formatNaira(quote.logisticsFeeKobo), { x: sumValX, y: curY, size: 8, font, color: colorDark });
   curY -= 14;
 
   page.drawText('Service & Equipment Crew:', { x: sumLabelX, y: curY, size: 8, font, color: colorDark });
-  page.drawText(formatPdfMoney(quote.serviceFeeKobo), { x: sumValX, y: curY, size: 8, font, color: colorDark });
+  page.drawText(formatNaira(quote.serviceFeeKobo), { x: sumValX, y: curY, size: 8, font, color: colorDark });
   curY -= 18;
 
   // Grand Total Box
@@ -205,7 +270,7 @@ export async function generateCateringInvoicePdf(
   });
 
   page.drawText('GRAND TOTAL:', { x: sumLabelX, y: curY - 1, size: 9, font: fontBold, color: colorCream });
-  page.drawText(formatPdfMoney(quote.totalKobo), { x: sumValX, y: curY - 1, size: 10, font: fontBold, color: colorGold });
+  page.drawText(formatNaira(quote.totalKobo), { x: sumValX, y: curY - 1, size: 10, font: fontBold, color: colorGold });
 
   curY -= 40;
 
@@ -223,7 +288,7 @@ export async function generateCateringInvoicePdf(
   page.drawText('PAYMENT SCHEDULE & COMMITMENT', { x: 55, y: curY - 12, size: 8, font: fontBold, color: colorWine });
 
   page.drawText(
-    `Deposit Required (${quote.depositPercentage}% to secure date): ${formatPdfMoney(quote.depositKobo)} [Status: ${quote.depositStatus.toUpperCase()}]`,
+    `Deposit Required (${quote.depositPercentage}% to secure date): ${formatNaira(quote.depositKobo)} [Status: ${quote.depositStatus.toUpperCase()}]`,
     {
       x: 55,
       y: curY - 28,
@@ -234,7 +299,7 @@ export async function generateCateringInvoicePdf(
   );
 
   page.drawText(
-    `Balance Due (30% payable 48h before event): ${formatPdfMoney(quote.balanceKobo)} [Status: ${quote.balanceStatus.toUpperCase()}]`,
+    `Balance Due (30% payable 48h before event): ${formatNaira(quote.balanceKobo)} [Status: ${quote.balanceStatus.toUpperCase()}]`,
     { x: 55, y: curY - 42, size: 9, font, color: colorDark }
   );
 
@@ -251,14 +316,27 @@ export async function generateCateringInvoicePdf(
     borderWidth: 1,
   });
 
+  const bankSettings =
+    options && 'bankDetails' in options
+      ? options.bankDetails
+        ? { ...options.bankDetails, verifiedByOwner: true }
+        : null
+      : getBusinessBankSettings();
+  const bankReady = Boolean(bankSettings && hasVerifiedBankSettings(bankSettings));
+
   page.drawText('OFFICIAL BANK PAYMENT DETAILS', { x: 55, y: curY - 10, size: 8, font: fontBold, color: colorDark });
-  page.drawText('Bank: Wema Bank   |   Account No: 0258778644   |   Account Name: ROCK UC FOODS / ESTHER KWENTUA', {
-    x: 55,
-    y: curY - 24,
-    size: 8,
-    font: fontBold,
-    color: colorWine,
-  });
+  page.drawText(
+    bankReady && bankSettings
+      ? `Bank: ${bankSettings.bankName}   |   Account No: ${bankSettings.accountNumber}   |   Account Name: ${bankSettings.accountName}`
+      : 'Payment details will be sent by ROCK UC FOODS.',
+    {
+      x: 55,
+      y: curY - 24,
+      size: 8,
+      font: fontBold,
+      color: colorWine,
+    }
+  );
   page.drawText(`Payment Reference: ${event.eventCode}   (Please send bank transfer confirmation via WhatsApp 08033729125)`, {
     x: 55,
     y: curY - 37,

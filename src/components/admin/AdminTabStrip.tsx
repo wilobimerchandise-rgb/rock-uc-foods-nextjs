@@ -31,6 +31,8 @@ import {
   BarChart3,
   BookOpen,
   Users,
+  MapPin,
+  FileEdit,
 } from 'lucide-react';
 
 export interface AdminTabItem {
@@ -52,6 +54,8 @@ export const ADMIN_TAB_ITEMS: AdminTabItem[] = [
   { id: 'alerts', label: 'Alerts Outbox', href: '/admin?tab=alerts', icon: Bell },
   { id: 'reports', label: 'Reports & Promos', href: '/admin?tab=reports', icon: BarChart3 },
   { id: 'menu', label: 'Menu Catalog & CSV', href: '/admin?tab=menu', icon: BookOpen },
+  { id: 'zones', label: 'Delivery Zones', href: '/admin?tab=zones', icon: MapPin },
+  { id: 'content', label: 'Site Content CMS', href: '/admin?tab=content', icon: FileEdit },
 ];
 
 function TabStripInner() {
@@ -77,7 +81,7 @@ function TabStripInner() {
 
   return (
     <div
-      className="relative w-full max-w-full min-w-0 bg-[#17120F]/90 border-b border-[#D4AF37]/20"
+      className="relative w-full max-w-full min-w-0 bg-[var(--bg-card)] border-b border-[var(--border-card)]"
       data-testid="admin-tab-strip-wrapper"
     >
       {/* Scrollable Container with overscroll containment */}
@@ -99,15 +103,15 @@ function TabStripInner() {
                 key={tab.id}
                 href={tab.href}
                 data-testid={`admin-tab-${tab.id}`}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold shrink-0 transition-all duration-150 whitespace-nowrap min-h-[40px] ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold shrink-0 transition-all duration-150 whitespace-nowrap min-h-[44px] ${
                   active
                     ? 'bg-[#6B1230] text-[#F7EFD9] border border-[#D4AF37]/60 shadow-md font-bold'
-                    : 'bg-[#0B0A09]/70 text-[#F7EFD9]/70 hover:text-[#F7EFD9] hover:bg-[#0B0A09] border border-white/5'
+                    : 'bg-[var(--nav-inactive-bg)] text-[var(--nav-inactive-text)] hover:border-[var(--border-gold)] border border-[var(--border-subtle-card)]'
                 }`}
               >
                 <Icon
                   className={`w-4 h-4 shrink-0 ${
-                    active ? 'text-[#D4AF37]' : 'text-[#F7EFD9]/60'
+                    active ? 'text-[#F3D98B]' : 'text-[var(--text-accent)]'
                   }`}
                 />
                 <span>{tab.label}</span>
@@ -119,7 +123,7 @@ function TabStripInner() {
 
       {/* Soft edge fade indicating scrollability */}
       <div
-        className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#17120F] to-transparent"
+        className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--bg-card)] to-transparent"
         aria-hidden="true"
         data-testid="admin-tab-strip-fade"
       />
@@ -131,7 +135,7 @@ export function AdminTabStrip() {
   return (
     <Suspense
       fallback={
-        <div className="w-full h-12 bg-[#17120F]/90 border-b border-[#D4AF37]/20 animate-pulse" />
+        <div className="w-full h-14 bg-[var(--bg-card)] border-b border-[var(--border-card)] animate-pulse" />
       }
     >
       <TabStripInner />

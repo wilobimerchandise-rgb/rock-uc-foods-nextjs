@@ -180,12 +180,27 @@ export function validateAndCalculatePromo(
 /**
  * Generates comprehensive sales analytics report across orders.
  */
+export function parseReportDateBoundMs(
+  dateStr: string | undefined,
+  bound: 'start' | 'end'
+): number {
+  if (!dateStr) return bound === 'start' ? 0 : Number.MAX_SAFE_INTEGER;
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    // Africa/Lagos is fixed UTC+1 year-round
+    return new Date(
+      bound === 'start' ? `${trimmed}T00:00:00.000+01:00` : `${trimmed}T23:59:59.999+01:00`
+    ).getTime();
+  }
+  return new Date(trimmed).getTime();
+}
+
 export function generateSalesReport(startDate?: string, endDate?: string): SalesReport {
   const allOrders = orderRepository.getAll();
-  const startMs = startDate ? new Date(startDate).getTime() : 0;
-  const endMs = endDate ? new Date(endDate).getTime() : Number.MAX_SAFE_INTEGER;
+  const startMs = parseReportDateBoundMs(startDate, 'start');
+  const endMs = parseReportDateBoundMs(endDate, 'end');
 
-  const qualifyingStatuses = ['payment_confirmed', 'in_kitchen', 'ready_for_dispatch', 'out_for_delivery', 'delivered'];
+  const qualifyingStatuses = ['paid', 'payment_confirmed', 'in_kitchen', 'ready_for_dispatch', 'out_for_delivery', 'delivered'];
 
   const filteredOrders = allOrders.filter((ord) => {
     const orderMs = new Date(ord.createdAt).getTime();
@@ -204,6 +219,7 @@ export function generateSalesReport(startDate?: string, endDate?: string): Sales
   for (const order of filteredOrders) {
     totalOrders++;
     grossRevenueKobo += order.subtotalKobo;
+    totalDiscountsKobo += order.discountKobo ?? 0n;
     totalDeliveryFeesKobo += order.deliveryFeeKobo;
     netRevenueKobo += order.totalKobo;
 

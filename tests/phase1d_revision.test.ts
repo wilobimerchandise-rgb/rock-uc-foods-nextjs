@@ -136,9 +136,9 @@ describe('Phase 1D: Invoice Revision & Amendment Engine (Rev 2+)', () => {
     // Check audit
     const audits = getAuditEvents().filter((e) => e.action === 'invoice.revised');
     expect(audits.length).toBe(1);
-    expect(audits[0].details.publicRef).toBe(revised.publicRef);
-    expect(audits[0].details.revision).toBe(2);
-    expect(audits[0].details.previousRevision).toBe(1);
+    expect(audits[0].details?.publicRef).toBe(revised.publicRef);
+    expect(audits[0].details?.revision).toBe(2);
+    expect(audits[0].details?.previousRevision).toBe(1);
   });
 
   it('2. Staff and Developer roles receive 403 and attempts are audited', async () => {
